@@ -1,10 +1,11 @@
 # Submission Package
 
-**Completeness note, stated up front**: this package is documentation-complete but
-deployment-incomplete. Every section below that requires a live URL, contract address, or
-transaction reference is marked "Not yet available" rather than filled with an invented value —
-see `docs/limitations.md` and the Phase 9 completion report for exactly why (no reachable Docker
-daemon or `genlayer.com` network egress in this development environment).
+**Completeness note, stated up front**: the contract is now deployed to GenLayer's public Asimov
+Testnet (see "Contract" below) — this package is no longer deployment-incomplete on that front. It
+still has no live production frontend URL, and no real two-wallet APPROVE/REJECT lifecycle has been
+run against the deployed contract yet; those sections below remain marked "Not yet available"
+rather than filled with an invented value — see `docs/limitations.md` and `docs/release-notes.md`
+"Blockers to v1.0.0."
 
 ## Project Name
 
@@ -86,20 +87,21 @@ frontend and contract layers.
 
 ## Repository
 
-Not filled in here — insert the actual repository URL at submission time; not invented in this
-document.
+https://github.com/Ankii1510/workresolve
 
 ## Contract
 
-**Not yet available.** Network: none (not deployed). Address: none. Explorer: n/a. See
-`docs/release-notes.md` "Blockers to v1.0.0."
+**Deployed.** Network: GenLayer Asimov Testnet (`testnet-asimov`, chain id `4221`). Address:
+`0x9F3B3360a4219A276ba76600e1CCD7B924eDC6C0`. Deployment transaction:
+`0xbcb13223a03a32a23adf217727adcc6884002d08c2e98c44fbebf2a19ced72dc`. Explorer:
+https://explorer-asimov.genlayer.com/. See `docs/release-notes.md` "Blockers to v1.0.0" for what's
+still pending (a real APPROVE/REJECT lifecycle and a public frontend).
 
 ## Testnet
 
-Intended network: `testnetAsimov` (GenLayer testnet, chain id `4221`) per
-`src/lib/genlayer/config.ts` — re-verify against GenLayer's current documentation before deploying,
-since the "current" public testnet has changed identity before (Phase 1 finding). No deployment has
-been made yet.
+Network: GenLayer Asimov Testnet (`testnet-asimov`, chain id `4221`) per
+`src/lib/genlayer/config.ts`. The contract above is deployed on this network. A real, two-wallet
+APPROVE flow and REJECT flow against it have not been run yet.
 
 ## Demo Video
 

@@ -54,12 +54,17 @@ for this release and belongs on the roadmap (see `README.md` "Roadmap"), not in 
 
 ## Blockers to v1.0.0
 
-1. A real contract deployment to a GenLayer network reachable from wherever this is built (this
-   development sandbox has neither a reachable Docker daemon nor network egress to any
-   `genlayer.com` host — re-confirmed every phase since Phase 4, including this one).
+1. ~~A real contract deployment to a GenLayer network~~ — **done.** Deployed to GenLayer Asimov
+   Testnet (`testnet-asimov`, chain id `4221`) via the official `genlayer` CLI, from a machine with
+   real network access (this development sandbox itself still has no `genlayer.com` egress — see
+   `docs/limitations.md`).
+   - Contract address: `0x9F3B3360a4219A276ba76600e1CCD7B924eDC6C0`
+   - Deployment transaction: `0xbcb13223a03a32a23adf217727adcc6884002d08c2e98c44fbebf2a19ced72dc`
+   - Explorer: https://explorer-asimov.genlayer.com/
 2. A real two-wallet APPROVE flow and REJECT flow, executed and recorded with actual transaction
-   hashes.
-3. A deployed, publicly reachable production frontend pointed at that contract.
+   hashes. **Still pending.**
+3. A deployed, publicly reachable production frontend pointed at that contract. **Still pending.**
 
-None of these are code changes — they are deployment/infrastructure actions that require an
-environment with real network access, which this one does not have.
+Item 1 was a deployment/infrastructure action, not a code change, and required an environment with
+real network access, which this development sandbox does not have — it was performed from the
+project owner's own machine. Items 2 and 3 remain.

@@ -4,10 +4,11 @@ Decentralized escrow for freelance milestones, evaluated by [GenLayer](https://w
 Intelligent Contracts and decentralized validator consensus — instead of a single centralized
 "approve" button.
 
-> **Status: v0.1.0-testnet, pre-launch.** This is a release-candidate build. It has not yet been
-> deployed to any live network, and no production frontend exists yet — see "Testnet" and
-> "Limitations" below for exactly what that means. See `docs/release-notes.md` for the full version
-> history and feature freeze.
+> **Status: v0.1.0-testnet.** The contract is deployed and live on GenLayer's Asimov Testnet — see
+> "Testnet" below for the address and transaction. No production frontend exists yet, and no real
+> APPROVE/REJECT lifecycle has been run against the live contract yet — see "Limitations" below for
+> exactly what that means. See `docs/release-notes.md` for the full version history and feature
+> freeze.
 
 ## Problem
 
@@ -123,15 +124,17 @@ Only what's actually implemented and tested:
 
 ## Testnet
 
-- **Network**: intended `testnetAsimov` (GenLayer public testnet, chain id `4221`) — see
-  `src/lib/genlayer/config.ts`. Re-verify against GenLayer's current documentation before deploying;
-  which network is "current" has changed before.
-- **Contract**: not yet deployed. No reachable Docker daemon and no network egress to any
-  `genlayer.com` host exist in the environment this project was built in — see
-  [`docs/limitations.md`](./docs/limitations.md) and `docs/release-notes.md` "Blockers to v1.0.0."
-- **Explorer**: not applicable until a deployment exists; `src/lib/genlayer/explorer.ts` derives
-  the correct explorer URL from the selected chain's own metadata once one does.
-- **Frontend**: not yet publicly deployed.
+- **Network**: GenLayer Asimov Testnet (alias `testnet-asimov`, chain id `4221`) — see
+  `src/lib/genlayer/config.ts`.
+- **Contract**: deployed. Address: `0x9F3B3360a4219A276ba76600e1CCD7B924eDC6C0`. Deployment
+  transaction: `0xbcb13223a03a32a23adf217727adcc6884002d08c2e98c44fbebf2a19ced72dc`. Deployed via the
+  official `genlayer` CLI from a machine with real network access — see
+  [`docs/genlayer-integration.md`](./docs/genlayer-integration.md) "GenLayer-specific proof."
+- **Explorer**: https://explorer-asimov.genlayer.com/ (search the contract address or transaction
+  hash above); `src/lib/genlayer/explorer.ts` derives the same URL from the selected chain's
+  metadata.
+- **Frontend**: not yet publicly deployed. Set `NEXT_PUBLIC_WORKRESOLVE_CONTRACT_ADDRESS` to the
+  address above to point a local run at the deployed contract.
 
 ## Getting Started
 

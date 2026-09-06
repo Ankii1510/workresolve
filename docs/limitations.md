@@ -5,15 +5,23 @@ stands today are listed — nothing here is a generic disclaimer.
 
 ## Environment / verification
 
-- **Nothing in this codebase has ever run against a live or local GenVM.** No reachable Docker
-  daemon (rules out a local GenLayer Studio simulator) and no network egress to any `genlayer.com`
-  host exist in this development sandbox — re-confirmed with a live check at the start of Phase 8,
-  the same result as every prior phase. Every claim about contract correctness, evaluation
-  behavior, and escrow accounting is verified at the deterministic pure-Python logic level (90/90
-  tests in `contracts/tests_logic`), not against real validator consensus.
+- **The contract is now deployed on GenLayer's real Asimov Testnet** (address
+  `0x9F3B3360a4219A276ba76600e1CCD7B924eDC6C0`, tx
+  `0xbcb13223a03a32a23adf217727adcc6884002d08c2e98c44fbebf2a19ced72dc` — see
+  `docs/genlayer-integration.md`), deployed via the official `genlayer` CLI from a machine with real
+  network access. This development sandbox itself still has no `genlayer.com` network egress and no
+  reachable Docker daemon, so the deployment and any live-network testing from here on must
+  continue to happen from a machine with real access, not from this sandbox. As of this deployment,
+  no milestone lifecycle (fund → accept → submit → evaluate → settle) has yet been run against the
+  live contract, so `evaluate_and_finalize`'s real `gl.exec_prompt`/`gl.get_webpage` calls and real
+  validator consensus remain unexercised in practice — every claim about contract correctness,
+  evaluation behavior, and escrow accounting is still verified only at the deterministic
+  pure-Python logic level (90/90 tests in `contracts/tests_logic`) plus this one deployment
+  transaction, not a full live run.
 - **`gl.ContractAt(...).emit_transfer(...)`, the mechanism that actually moves funds out of the
-  contract, has never been exercised.** This is the single highest-priority item to verify before
-  this contract is trusted with real funds — see `docs/contracts.md` "Known Limitations."
+  contract, has not yet been exercised against the live deployment.** This is the single
+  highest-priority item to verify next, via a real funded milestone and settlement — see
+  `docs/contracts.md` "Known Limitations."
 - **Wallet and browser edge cases (locked wallet, mid-session account/network switch, browser
   refresh during a pending transaction) were verified by code review, not live manual testing.** No
   browser automation was used in any phase of this project.

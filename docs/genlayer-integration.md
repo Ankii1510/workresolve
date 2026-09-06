@@ -88,15 +88,21 @@ centralized or absent.
 - **Intelligent Contract source**: `contracts/workresolve.py` (the deployable source);
   `contracts/logic/workresolve_logic.py` is a pure-Python, independently-testable mirror of its
   deterministic core (see that file's own docstring for why the split exists).
-- **Contract address / network**: not yet available — no deployment has been made from this
-  development environment (no reachable Docker daemon, no `genlayer.com` network egress — see
-  `docs/limitations.md`). This section must be filled in with the real address and network the
-  moment a deployment exists; see `docs/release-notes.md` "Blockers to v1.0.0."
+- **Contract address / network**: deployed to **GenLayer Asimov Testnet** (alias `testnet-asimov`,
+  chain id `4221`, RPC `https://rpc-asimov.genlayer.com`).
+  - Contract address: `0x9F3B3360a4219A276ba76600e1CCD7B924eDC6C0`
+  - Deployment transaction: `0xbcb13223a03a32a23adf217727adcc6884002d08c2e98c44fbebf2a19ced72dc`
+  - Explorer: https://explorer-asimov.genlayer.com/ (search the address or transaction hash above)
+  - Deployed via the official `genlayer` CLI (`genlayer deploy --contract workresolve.py`) from a
+    machine with real network access — this development sandbox itself has no `genlayer.com`
+    network egress (see `docs/limitations.md`), so deployment was performed outside it, not by
+    disabling or working around that restriction.
 - **Relevant contract methods**: `evaluate_and_finalize` (the one GenLayer-dependent method —
   `contracts/workresolve.py`, search for `gl.get_webpage`/`gl.exec_prompt`/
   `gl.eq_principle_prompt_comparative`); `compute_score`/`decide` (the deterministic consumers of
   its result).
 - **Evaluation flow**: fully documented end to end in `docs/evaluation.md`, including the exact
   prompt structure, the evaluator input schema, and the consensus visualization shown in the UI.
-- **Transaction/reference examples**: none exist yet for the same deployment reason above — see
-  `docs/demo.md` for the exact script to produce them once a deployment exists.
+- **Transaction/reference examples**: the deployment transaction above is the first real one. A
+  real APPROVE and a real REJECT milestone lifecycle (two wallets, real testnet GEN, real
+  transaction hashes) are the next step — see `docs/demo.md`.
