@@ -79,7 +79,7 @@ treated as untrusted content, never as instructions); consensus-gated, structure
 per-requirement results; on-chain-derived reputation with a documented formula; a local per-wallet
 transaction/activity log; a full transaction-lifecycle UI (never shows success before real
 confirmation); a verified production CSP and security headers; EIP-6963 multi-wallet discovery (no
-single vendor's wallet hardcoded); 238 passing tests across the
+single vendor's wallet hardcoded); 239 passing tests across the
 frontend and contract layers.
 
 ## Live Demo
@@ -99,7 +99,7 @@ https://github.com/Ankii1510/workresolve
 `0x9F3B3360a4219A276ba76600e1CCD7B924eDC6C0`. Deployment transaction:
 `0xbcb13223a03a32a23adf217727adcc6884002d08c2e98c44fbebf2a19ced72dc`. Explorer:
 https://explorer-asimov.genlayer.com/. See `docs/release-notes.md` "Blockers to v1.0.0" for what's
-still pending (a real APPROVE/REJECT lifecycle and a public frontend).
+still pending (a real, end-to-end two-wallet APPROVE/REJECT lifecycle).
 
 ## Testnet
 
@@ -124,10 +124,10 @@ to any deployment of this contract.
 
 ## Limitations
 
-Full list: `docs/limitations.md`. Headline items: no live deployment exists yet; AI evaluation is
-probabilistic, not a legal judgment; external evidence can disappear after submission; no
-dispute/appeals mechanism beyond the evaluation itself; transaction history is a local per-browser
-log, not a cross-device ledger.
+Full list: `docs/limitations.md`. Headline items: no real, end-to-end APPROVE/REJECT lifecycle has
+been run against the live contract yet; AI evaluation is probabilistic, not a legal judgment;
+external evidence can disappear after submission; no dispute/appeals mechanism beyond the
+evaluation itself; transaction history is a local per-browser log, not a cross-device ledger.
 
 ## Future Roadmap
 

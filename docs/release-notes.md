@@ -51,7 +51,7 @@ for this release and belongs on the roadmap (see `README.md` "Roadmap"), not in 
   shows a picker whenever more than one is available (falls back to a single "Browser Wallet" legacy
   option when none announce via EIP-6963). No new dependency or external service — this is a plain
   browser event convention (see `docs/frontend.md` "Wallet Architecture"). Test suite grew from
-  144/144 to 148/148 frontend unit tests as part of this fix.
+  144/144 to 149/149 frontend unit tests as part of this fix.
 
 ## What's explicitly NOT in v0.1.0-testnet
 

@@ -242,6 +242,13 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         }
         const accounts = await requestAccounts(provider);
         const chainId = await getCurrentChainId(provider);
+        // Mark auto-restore as already settled for this page load. Without
+        // this, an explicit connect() here still leaves restoredRef false,
+        // so the very next disconnect() would make the auto-restore effect
+        // (which re-runs whenever state.address changes) immediately see
+        // the wallet extension still authorizes this site and silently
+        // reconnect — the exact "disconnect does nothing" bug this guards.
+        restoredRef.current = true;
         setActiveProvider(provider);
         setState({ address: accounts[0] ?? null, chainId, isConnecting: false, error: null });
       } catch (err) {
@@ -255,10 +262,17 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const disconnect = useCallback(() => {
     // EIP-1193 has no standard programmatic disconnect — we only clear the
     // app's local view of the connection. The wallet extension itself stays
-    // authorized until the user revokes it there.
+    // authorized until the user revokes it there, which means eth_accounts
+    // would still return it. Deliberately NOT resetting restoredRef here:
+    // doing so used to make the auto-restore effect (which re-runs whenever
+    // state.address changes) immediately see that same authorization and
+    // silently reconnect right after this call, so clicking "disconnect"
+    // appeared to do nothing. Leaving restoredRef at whatever it already is
+    // means this session won't auto-restore again after an explicit
+    // disconnect — the user has to click "Connect Wallet" again, which is
+    // the whole point of the button.
     setState(initialState);
     setActiveProvider(null);
-    restoredRef.current = false;
   }, []);
 
   const [isSwitchingNetwork, setIsSwitchingNetwork] = useState(false);

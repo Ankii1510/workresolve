@@ -113,6 +113,35 @@ describe("useWallet", () => {
     expect(result.current.writeClient).not.toBeNull(); // a client still exists — the UI, not the client, gates writes
   });
 
+  it("stays disconnected after disconnect() even though the wallet still authorizes the site (eth_accounts still returns it)", async () => {
+    // Regression test: EIP-1193 has no real programmatic disconnect, so
+    // eth_accounts legitimately keeps returning the account after our own
+    // disconnect() clears local state — same as a real wallet extension
+    // behaves when the app calls disconnect() without the user revoking
+    // the site's permission in the extension itself. The auto-restore
+    // effect must not treat that as "please reconnect me".
+    const provider = makeFakeProvider({ accounts: ["0x1234567890abcdef1234567890abcdef12345678"] });
+    // @ts-expect-error assigning a test fake to the injected wallet global
+    window.ethereum = provider;
+
+    const { result } = renderHook(() => useWallet(), { wrapper });
+    await act(async () => {
+      await result.current.connect();
+    });
+    await waitFor(() => expect(result.current.isConnected).toBe(true));
+
+    act(() => {
+      result.current.disconnect();
+    });
+
+    expect(result.current.isConnected).toBe(false);
+    // Give any stray async auto-restore effect a chance to (incorrectly)
+    // fire before asserting it didn't.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(result.current.isConnected).toBe(false);
+    expect(result.current.address).toBeNull();
+  });
+
   it("updates the connected address when the wallet emits accountsChanged", async () => {
     const provider = makeFakeProvider({ accounts: ["0x1234567890abcdef1234567890abcdef12345678"] });
     // @ts-expect-error assigning a test fake to the injected wallet global
