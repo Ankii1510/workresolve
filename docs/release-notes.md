@@ -63,8 +63,11 @@ for this release and belongs on the roadmap (see `README.md` "Roadmap"), not in 
    - Explorer: https://explorer-asimov.genlayer.com/
 2. A real two-wallet APPROVE flow and REJECT flow, executed and recorded with actual transaction
    hashes. **Still pending.**
-3. A deployed, publicly reachable production frontend pointed at that contract. **Still pending.**
+3. ~~A deployed, publicly reachable production frontend pointed at that contract~~ — **done.** Live
+   at https://workresolve.vercel.app/, deployed on Vercel and configured with
+   `NEXT_PUBLIC_WORKRESOLVE_CONTRACT_ADDRESS` pointed at the deployed contract (verified: the
+   Create Milestone form loads with no "not configured" error).
 
-Item 1 was a deployment/infrastructure action, not a code change, and required an environment with
-real network access, which this development sandbox does not have — it was performed from the
-project owner's own machine. Items 2 and 3 remain.
+Items 1 and 3 were deployment/infrastructure actions, not code changes, and required an environment
+with real network access, which this development sandbox does not have — both were performed from
+the project owner's own machine. Item 2 remains.

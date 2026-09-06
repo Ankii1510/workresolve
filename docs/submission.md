@@ -1,11 +1,11 @@
 # Submission Package
 
-**Completeness note, stated up front**: the contract is now deployed to GenLayer's public Asimov
-Testnet (see "Contract" below) — this package is no longer deployment-incomplete on that front. It
-still has no live production frontend URL, and no real two-wallet APPROVE/REJECT lifecycle has been
-run against the deployed contract yet; those sections below remain marked "Not yet available"
-rather than filled with an invented value — see `docs/limitations.md` and `docs/release-notes.md`
-"Blockers to v1.0.0."
+**Completeness note, stated up front**: the contract is deployed to GenLayer's public Asimov
+Testnet and the frontend is publicly live on Vercel (see "Contract" and "Live Demo" below) — this
+package is no longer deployment-incomplete. The one thing still outstanding is a real, end-to-end
+two-wallet APPROVE/REJECT lifecycle recorded against the live contract; that section below remains
+marked accordingly rather than filled with an invented value — see `docs/limitations.md` and
+`docs/release-notes.md` "Blockers to v1.0.0."
 
 ## Project Name
 
@@ -83,7 +83,10 @@ frontend and contract layers.
 
 ## Live Demo
 
-**Not yet available.** No production frontend has been deployed from this development environment.
+https://workresolve.vercel.app/ — deployed on Vercel, pointed at the deployed contract (see
+"Contract" below). A real, end-to-end two-wallet APPROVE/REJECT lifecycle has not been run against
+it yet; the static `/demo` page walks through the flow with clearly labeled illustrative examples
+in the meantime.
 
 ## Repository
 

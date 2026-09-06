@@ -4,11 +4,11 @@ Decentralized escrow for freelance milestones, evaluated by [GenLayer](https://w
 Intelligent Contracts and decentralized validator consensus — instead of a single centralized
 "approve" button.
 
-> **Status: v0.1.0-testnet.** The contract is deployed and live on GenLayer's Asimov Testnet — see
-> "Testnet" below for the address and transaction. No production frontend exists yet, and no real
-> APPROVE/REJECT lifecycle has been run against the live contract yet — see "Limitations" below for
-> exactly what that means. See `docs/release-notes.md` for the full version history and feature
-> freeze.
+> **Status: v0.1.0-testnet.** The contract is deployed and live on GenLayer's Asimov Testnet, and the
+> frontend is publicly live at https://workresolve.vercel.app/ — see "Testnet" below for the
+> address and transaction. No real, end-to-end APPROVE/REJECT milestone lifecycle has been run
+> against the live contract yet — see "Limitations" below for exactly what that means. See
+> `docs/release-notes.md` for the full version history and feature freeze.
 
 ## Problem
 
@@ -133,8 +133,8 @@ Only what's actually implemented and tested:
 - **Explorer**: https://explorer-asimov.genlayer.com/ (search the contract address or transaction
   hash above); `src/lib/genlayer/explorer.ts` derives the same URL from the selected chain's
   metadata.
-- **Frontend**: not yet publicly deployed. Set `NEXT_PUBLIC_WORKRESOLVE_CONTRACT_ADDRESS` to the
-  address above to point a local run at the deployed contract.
+- **Frontend**: live at https://workresolve.vercel.app/, deployed on Vercel and pointed at the
+  contract address above via `NEXT_PUBLIC_WORKRESOLVE_CONTRACT_ADDRESS`.
 
 ## Getting Started
 
