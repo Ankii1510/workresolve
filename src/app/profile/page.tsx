@@ -15,7 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorNotice } from "@/components/ui/ErrorNotice";
 import { Spinner } from "@/components/ui/Spinner";
-import { Button } from "@/components/ui/Button";
+import { WalletConnectButton } from "@/components/wallet/WalletConnectButton";
 import type { AppGenLayerClient } from "@/lib/genlayer/client";
 import type { Milestone } from "@/types";
 
@@ -77,7 +77,7 @@ export default function ProfilePage() {
         <div className="mt-8">
           <EmptyState
             title="Connect your wallet to view your profile"
-            action={<Button onClick={wallet.connect}>Connect Wallet</Button>}
+            action={<WalletConnectButton />}
           />
         </div>
       ) : (

@@ -15,7 +15,7 @@ export function WalletStatus() {
 
   if (!wallet.hasWallet) {
     return (
-      <Badge tone="warning">No wallet detected — install a MetaMask-compatible wallet to continue.</Badge>
+      <Badge tone="warning">No wallet detected — install an EIP-1193 browser wallet to continue.</Badge>
     );
   }
 

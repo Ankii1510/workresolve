@@ -4,12 +4,16 @@
  * Wallet state provider + hook — the single source of truth for wallet
  * connection state across the app (docs/architecture.md sections 13 & 14).
  *
- * Responsibilities implemented here (Phase 3 wallet foundation only — no
- * milestone transactions are triggered from this file):
- *   - connect / disconnect
+ * Responsibilities implemented here:
+ *   - discovering every installed wallet extension (EIP-6963), not just
+ *     whichever one happens to occupy `window.ethereum`, so a user with
+ *     multiple wallets installed can choose which one to connect with (see
+ *     lib/genlayer/eip6963.ts for why this exists and how discovery works)
+ *   - connect (to a chosen wallet, or the only one available) / disconnect
  *   - shortened address display (via lib/genlayer/wallet)
  *   - current network detection + "wrong network" detection
- *   - reacting to `accountsChanged` and `chainChanged` wallet events
+ *   - reacting to `accountsChanged` and `chainChanged` events from whichever
+ *     wallet is actually connected
  *   - exposing a ready-to-use write client once connected
  *
  * This is a React Context provider (not a bare hook) because wallet state
@@ -38,12 +42,26 @@ import {
   getCurrentChainId,
   getInjectedProvider,
   requestAccounts,
-  requireInjectedProvider,
   shortenAddress,
   switchToExpectedNetwork,
 } from "@/lib/genlayer/wallet";
+import { subscribeToAnnouncedProviders, type EIP6963ProviderDetail } from "@/lib/genlayer/eip6963";
 import { logDevError, toAppError } from "@/lib/utils/errors";
+import { ConfigError } from "@/lib/genlayer/config";
 import type { AppError, WalletConnectionStatus } from "@/types";
+
+/** A stable id for the legacy `window.ethereum` slot, used as a picker entry
+ * only when no EIP-6963-compliant wallet has announced itself — some older
+ * or non-compliant extensions still only work this way. */
+const LEGACY_PROVIDER_RDNS = "legacy.window.ethereum";
+
+/** One selectable entry in the "choose a wallet" list — deliberately just
+ * enough to render a picker (name + icon) and to reconnect to it later. */
+export interface WalletOption {
+  rdns: string;
+  name: string;
+  icon: string | null;
+}
 
 interface WalletState {
   address: string | null;
@@ -59,11 +77,21 @@ export interface WalletContextValue extends WalletState {
   expectedChainId: number;
   expectedNetworkName: string;
   hasWallet: boolean;
+  /** Every wallet currently available to connect to (via EIP-6963
+   * discovery, or the single legacy `window.ethereum` slot as a fallback
+   * when no wallet announces itself). Render this as a picker whenever it
+   * has more than one entry — see components/wallet/WalletConnectButton. */
+  walletOptions: WalletOption[];
   /** Explicit 5-state connection status — see docs/frontend.md "Wallet
    * Architecture". Derived from the flags above; prefer this in UI/tests
    * over re-deriving it from isConnecting/isConnected/isCorrectNetwork. */
   status: WalletConnectionStatus;
-  connect: () => Promise<void>;
+  /** Connects to the wallet identified by `rdns` (a `walletOptions[].rdns`
+   * value). Omit `rdns` only when `walletOptions.length <= 1` — with zero
+   * it reports "no wallet installed", with exactly one it connects to it
+   * directly; with more than one, omitting it fails with an AppError
+   * asking the caller to let the user pick, rather than guessing. */
+  connect: (rdns?: string) => Promise<void>;
   disconnect: () => void;
   /** Prompts the wallet to switch to (or add, if unknown) the expected
    * GenLayer network via EIP-3326/3085. Not all wallets support this — see
@@ -87,37 +115,92 @@ const initialState: WalletState = {
 
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<WalletState>(initialState);
-  const providerRef = useRef<EthereumProvider | null>(null);
+  const [announcedWallets, setAnnouncedWallets] = useState<EIP6963ProviderDetail[]>([]);
+  // The provider actually connected right now (auto-restored or explicitly
+  // chosen). Kept in state, not only a ref, so the event-listener effect
+  // below can depend on it and rebind to whichever wallet the user actually
+  // picked — with a plain ref it would silently keep listening to whatever
+  // was around at mount, which breaks the moment there's more than one
+  // wallet to choose between.
+  const [activeProvider, setActiveProvider] = useState<EthereumProvider | null>(null);
+  const restoredRef = useRef(false);
   const { chain } = getGenLayerConfig();
 
-  // Restore an already-authorized connection on mount (no prompt).
+  // Discover every EIP-6963-announcing wallet. Kept subscribed for the
+  // component's lifetime, not just at mount, since some extensions inject
+  // and announce themselves slightly after initial page load.
   useEffect(() => {
-    const provider = getInjectedProvider();
-    if (!provider) return;
-    providerRef.current = provider;
+    return subscribeToAnnouncedProviders(setAnnouncedWallets);
+  }, []);
+
+  const resolveProvider = useCallback(
+    (rdns?: string): EthereumProvider | null => {
+      if (rdns === LEGACY_PROVIDER_RDNS) return getInjectedProvider();
+      if (rdns) return announcedWallets.find((d) => d.info.rdns === rdns)?.provider ?? null;
+      // No explicit choice: only safe to guess when there's exactly one
+      // candidate. Zero or many must be handled by the caller (surfaced as
+      // "no wallet" / "ambiguous, please choose" respectively).
+      if (announcedWallets.length === 1) return announcedWallets[0].provider;
+      if (announcedWallets.length === 0) return getInjectedProvider();
+      return null;
+    },
+    [announcedWallets],
+  );
+
+  const walletOptions: WalletOption[] = useMemo(() => {
+    if (announcedWallets.length > 0) {
+      return announcedWallets.map((d) => ({ rdns: d.info.rdns, name: d.info.name, icon: d.info.icon }));
+    }
+    if (typeof window !== "undefined" && getInjectedProvider()) {
+      return [{ rdns: LEGACY_PROVIDER_RDNS, name: "Browser Wallet", icon: null }];
+    }
+    return [];
+  }, [announcedWallets]);
+
+  // Restore an already-authorized connection on mount (no prompt), trying
+  // every known wallet (not just one) since the user may have last
+  // connected with any of them. Re-attempted whenever the set of announced
+  // wallets grows, but only until the first successful restore.
+  useEffect(() => {
+    if (restoredRef.current || state.address) return;
+    const candidates: EthereumProvider[] =
+      announcedWallets.length > 0
+        ? announcedWallets.map((d) => d.provider)
+        : (() => {
+            const legacy = getInjectedProvider();
+            return legacy ? [legacy] : [];
+          })();
+    if (candidates.length === 0) return;
 
     let cancelled = false;
     (async () => {
-      try {
-        const accounts = await getAuthorizedAccounts(provider);
-        if (cancelled || accounts.length === 0) return;
-        const chainId = await getCurrentChainId(provider);
-        if (cancelled) return;
-        setState((s) => ({ ...s, address: accounts[0] ?? null, chainId }));
-      } catch (err) {
-        logDevError("wallet auto-restore failed", err);
+      for (const provider of candidates) {
+        try {
+          const accounts = await getAuthorizedAccounts(provider);
+          if (cancelled) return;
+          if (accounts.length > 0) {
+            const chainId = await getCurrentChainId(provider);
+            if (cancelled) return;
+            restoredRef.current = true;
+            setActiveProvider(provider);
+            setState((s) => ({ ...s, address: accounts[0] ?? null, chainId }));
+            return;
+          }
+        } catch (err) {
+          logDevError("wallet auto-restore failed", err);
+        }
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [announcedWallets, state.address]);
 
-  // React to account/network changes made outside the app (in the wallet UI).
+  // React to account/network changes made outside the app (in the wallet
+  // UI), always bound to whichever provider is actually connected.
   useEffect(() => {
-    const provider = providerRef.current ?? getInjectedProvider();
-    if (!provider) return;
+    if (!activeProvider) return;
 
     const onAccountsChanged = (...args: unknown[]) => {
       const accounts = (args[0] as string[]) ?? [];
@@ -132,47 +215,59 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     // than leaving the UI showing a stale connected address.
     const onDisconnect = () => {
       setState(initialState);
+      setActiveProvider(null);
     };
 
-    provider.on("accountsChanged", onAccountsChanged);
-    provider.on("chainChanged", onChainChanged);
-    provider.on("disconnect", onDisconnect);
+    activeProvider.on("accountsChanged", onAccountsChanged);
+    activeProvider.on("chainChanged", onChainChanged);
+    activeProvider.on("disconnect", onDisconnect);
     return () => {
-      provider.removeListener("accountsChanged", onAccountsChanged);
-      provider.removeListener("chainChanged", onChainChanged);
-      provider.removeListener("disconnect", onDisconnect);
+      activeProvider.removeListener("accountsChanged", onAccountsChanged);
+      activeProvider.removeListener("chainChanged", onChainChanged);
+      activeProvider.removeListener("disconnect", onDisconnect);
     };
-  }, []);
+  }, [activeProvider]);
 
-  const connect = useCallback(async () => {
-    setState((s) => ({ ...s, isConnecting: true, error: null }));
-    try {
-      const provider = requireInjectedProvider();
-      providerRef.current = provider;
-      const accounts = await requestAccounts(provider);
-      const chainId = await getCurrentChainId(provider);
-      setState({ address: accounts[0] ?? null, chainId, isConnecting: false, error: null });
-    } catch (err) {
-      logDevError("wallet connect failed", err);
-      setState((s) => ({ ...s, isConnecting: false, error: toAppError(err) }));
-    }
-  }, []);
+  const connect = useCallback(
+    async (rdns?: string) => {
+      setState((s) => ({ ...s, isConnecting: true, error: null }));
+      try {
+        const provider = resolveProvider(rdns);
+        if (!provider) {
+          throw new ConfigError(
+            announcedWallets.length > 1
+              ? "Multiple wallets detected — choose one to connect."
+              : "No wallet extension detected. Install a browser wallet to connect.",
+          );
+        }
+        const accounts = await requestAccounts(provider);
+        const chainId = await getCurrentChainId(provider);
+        setActiveProvider(provider);
+        setState({ address: accounts[0] ?? null, chainId, isConnecting: false, error: null });
+      } catch (err) {
+        logDevError("wallet connect failed", err);
+        setState((s) => ({ ...s, isConnecting: false, error: toAppError(err) }));
+      }
+    },
+    [resolveProvider, announcedWallets.length],
+  );
 
   const disconnect = useCallback(() => {
     // EIP-1193 has no standard programmatic disconnect — we only clear the
     // app's local view of the connection. The wallet extension itself stays
     // authorized until the user revokes it there.
     setState(initialState);
+    setActiveProvider(null);
+    restoredRef.current = false;
   }, []);
 
   const [isSwitchingNetwork, setIsSwitchingNetwork] = useState(false);
   const switchNetwork = useCallback(async () => {
-    const provider = providerRef.current ?? getInjectedProvider();
-    if (!provider) return;
+    if (!activeProvider) return;
     setIsSwitchingNetwork(true);
     try {
-      await switchToExpectedNetwork(provider, chain);
-      const chainId = await getCurrentChainId(provider);
+      await switchToExpectedNetwork(activeProvider, chain);
+      const chainId = await getCurrentChainId(activeProvider);
       setState((s) => ({ ...s, chainId, error: null }));
     } catch (err) {
       logDevError("network switch failed", err);
@@ -180,14 +275,14 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsSwitchingNetwork(false);
     }
-  }, [chain]);
+  }, [activeProvider, chain]);
 
   const readClient = useMemo(() => getReadClient(), []);
 
   const writeClient = useMemo(() => {
-    if (!state.address || !providerRef.current) return null;
-    return createWriteClient(state.address as `0x${string}`, providerRef.current);
-  }, [state.address]);
+    if (!state.address || !activeProvider) return null;
+    return createWriteClient(state.address as `0x${string}`, activeProvider);
+  }, [state.address, activeProvider]);
 
   const isCorrectNetwork = state.chainId === null ? false : state.chainId === chain.id;
   const isConnected = !!state.address;
@@ -208,7 +303,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     isCorrectNetwork,
     expectedChainId: chain.id,
     expectedNetworkName: chain.name,
-    hasWallet: typeof window !== "undefined" && !!getInjectedProvider(),
+    hasWallet: walletOptions.length > 0,
+    walletOptions,
     status,
     connect,
     disconnect,

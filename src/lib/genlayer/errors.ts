@@ -77,9 +77,9 @@ export function friendlyRevertMessage(rawReason: string): string {
   return trimmed.length > 200 ? `${trimmed.slice(0, 200)}…` : trimmed || "The contract rejected this transaction.";
 }
 
-/** EIP-1193 code 4200 = "Unsupported Method"; some non-MetaMask-compatible
- * injected wallets also throw a plain "not supported"/"not a function"
- * style message when asked for eth_requestAccounts/eth_chainId. */
+/** EIP-1193 code 4200 = "Unsupported Method"; some non-compliant injected
+ * wallets also throw a plain "not supported"/"not a function" style message
+ * when asked for eth_requestAccounts/eth_chainId. */
 export function isUnsupportedWallet(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
   const code = (error as { code?: unknown }).code;
@@ -138,7 +138,7 @@ export function classifyBlockchainError(error: unknown): AppError | null {
   if (isUnsupportedWallet(error)) {
     return {
       code: "UNSUPPORTED_WALLET",
-      message: "Your wallet doesn't support the method WorkResolve needs. Try a MetaMask-compatible wallet.",
+      message: "Your wallet doesn't support the method WorkResolve needs. Try a different EIP-1193 wallet.",
       cause: error,
     };
   }

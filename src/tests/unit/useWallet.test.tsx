@@ -44,6 +44,25 @@ function wrapper({ children }: { children: ReactNode }) {
   return <WalletProvider>{children}</WalletProvider>;
 }
 
+/** Simulates a real EIP-6963-compliant wallet extension: listens for the
+ * app's discovery request and announces itself in response, exactly like
+ * lib/genlayer/eip6963.ts expects. Returns a cleanup function. */
+function announceEip6963Wallet(rdns: string, name: string, provider: unknown) {
+  const onRequest = () => {
+    window.dispatchEvent(
+      new CustomEvent("eip6963:announceProvider", {
+        detail: { info: { uuid: rdns, name, icon: "", rdns }, provider },
+      }),
+    );
+  };
+  window.addEventListener("eip6963:requestProvider", onRequest);
+  // The real flow: an extension also announces proactively on load, not
+  // only in response to a request event that may have already fired before
+  // it was ready — fire once immediately too.
+  onRequest();
+  return () => window.removeEventListener("eip6963:requestProvider", onRequest);
+}
+
 describe("useWallet", () => {
   afterEach(() => {
     // @ts-expect-error test cleanup of a test-only global
@@ -153,5 +172,79 @@ describe("useWallet", () => {
     await waitFor(() => expect(result.current.error?.code).toBe("USER_REJECTED"));
     expect(result.current.isConnected).toBe(false);
     expect(result.current.status).toBe("ERROR");
+  });
+
+  describe("EIP-6963 multi-wallet discovery", () => {
+    it("lists every announced wallet as a walletOption, not just window.ethereum", async () => {
+      const providerA = makeFakeProvider();
+      const providerB = makeFakeProvider();
+      const cleanupA = announceEip6963Wallet("com.example.walleta", "Wallet A", providerA);
+      const cleanupB = announceEip6963Wallet("com.example.walletb", "Wallet B", providerB);
+
+      const { result } = renderHook(() => useWallet(), { wrapper });
+
+      await waitFor(() => expect(result.current.walletOptions).toHaveLength(2));
+      expect(result.current.walletOptions.map((w) => w.name).sort()).toEqual(["Wallet A", "Wallet B"]);
+      expect(result.current.hasWallet).toBe(true);
+
+      cleanupA();
+      cleanupB();
+    });
+
+    it("connects to the specific wallet chosen by rdns, not an arbitrary one", async () => {
+      const providerA = makeFakeProvider({ accounts: ["0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"] });
+      const providerB = makeFakeProvider({ accounts: ["0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"] });
+      const cleanupA = announceEip6963Wallet("com.example.walleta", "Wallet A", providerA);
+      const cleanupB = announceEip6963Wallet("com.example.walletb", "Wallet B", providerB);
+
+      const { result } = renderHook(() => useWallet(), { wrapper });
+      await waitFor(() => expect(result.current.walletOptions).toHaveLength(2));
+
+      await act(async () => {
+        await result.current.connect("com.example.walletb");
+      });
+
+      await waitFor(() => expect(result.current.isConnected).toBe(true));
+      expect(result.current.address?.toLowerCase()).toBe("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+      // Only the chosen wallet should have been asked to connect.
+      expect(providerA.request).not.toHaveBeenCalledWith(
+        expect.objectContaining({ method: "eth_requestAccounts" }),
+      );
+
+      cleanupA();
+      cleanupB();
+    });
+
+    it("fails with a clear error when connect() is called with no choice and multiple wallets are available", async () => {
+      const providerA = makeFakeProvider();
+      const providerB = makeFakeProvider();
+      const cleanupA = announceEip6963Wallet("com.example.walleta", "Wallet A", providerA);
+      const cleanupB = announceEip6963Wallet("com.example.walletb", "Wallet B", providerB);
+
+      const { result } = renderHook(() => useWallet(), { wrapper });
+      await waitFor(() => expect(result.current.walletOptions).toHaveLength(2));
+
+      await act(async () => {
+        await result.current.connect();
+      });
+
+      await waitFor(() => expect(result.current.status).toBe("ERROR"));
+      expect(result.current.error?.message).toMatch(/choose one/i);
+      expect(result.current.isConnected).toBe(false);
+
+      cleanupA();
+      cleanupB();
+    });
+
+    it("falls back to the legacy window.ethereum slot as a single option when no wallet announces via EIP-6963", () => {
+      const provider = makeFakeProvider();
+      // @ts-expect-error assigning a test fake to the injected wallet global
+      window.ethereum = provider;
+
+      const { result } = renderHook(() => useWallet(), { wrapper });
+      expect(result.current.walletOptions).toHaveLength(1);
+      expect(result.current.walletOptions[0].name).toBe("Browser Wallet");
+      expect(result.current.hasWallet).toBe(true);
+    });
   });
 });

@@ -1,18 +1,23 @@
 /**
  * Low-level EIP-1193 wallet helpers. This module talks to `window.ethereum`
- * directly; it is the one place that does so. `useWallet` (src/hooks) is the
- * only consumer — components should use that hook, never these functions
- * directly.
+ * (the legacy single-provider slot) directly; it is the one place that does
+ * so. Multi-wallet discovery (EIP-6963 — letting a user with several wallet
+ * extensions installed choose between them) lives in `lib/genlayer/eip6963.ts`
+ * instead, since it works fundamentally differently (event-based discovery
+ * of many providers, not reading one global). `useWallet` (src/hooks) is the
+ * only consumer of either module — components should use that hook, never
+ * these functions directly.
  *
- * Why EIP-1193 / MetaMask-compatible rather than a GenLayer-specific wallet:
- * confirmed in Phase 1 and re-confirmed against the installed SDK's own
- * `ClientConfig` type (see client.ts) — `createClient` accepts a plain
+ * Why EIP-1193 (any compliant browser wallet) rather than a GenLayer-specific
+ * wallet: confirmed in Phase 1 and re-confirmed against the installed SDK's
+ * own `ClientConfig` type (see client.ts) — `createClient` accepts a plain
  * `provider: EthereumProvider` and drives signing/network switching through
- * it, which is exactly the `window.ethereum` shape. A dedicated
+ * it, which is exactly the shape every EIP-1193 wallet (MetaMask, Coinbase
+ * Wallet, Rabby, Brave Wallet, and others) exposes. A dedicated
  * `genlayer-wallet` package exists (genlayerlabs/genlayer-wallet) as a
- * possible future enhancement, but the SDK does not require it, so it is
- * out of scope for the Phase 3 wallet foundation (see docs/architecture.md
- * section 14 and the Phase 2 "SHOULD HAVE" list).
+ * possible future enhancement, but the SDK does not require it, so it
+ * remains out of scope here (see docs/architecture.md section 14 and the
+ * Phase 2 "SHOULD HAVE" list).
  */
 import type { GenLayerChain } from "genlayer-js/types";
 import type { EthereumProvider } from "./client";
@@ -59,9 +64,7 @@ export function shortenAddress(address: string, chars = 4): string {
 export function requireInjectedProvider(): EthereumProvider {
   const provider = getInjectedProvider();
   if (!provider) {
-    throw new ConfigError(
-      "No wallet extension detected. Install a MetaMask-compatible browser wallet to connect.",
-    );
+    throw new ConfigError("No wallet extension detected. Install a browser wallet to connect.");
   }
   return provider;
 }

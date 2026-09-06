@@ -64,6 +64,13 @@ introducing a second, parallel `lib/blockchain/` tree:
   first, falls back to `wallet_addEthereumChain` (EIP-3085) using `chain.rpcUrls`/`nativeCurrency`/
   `blockExplorers` taken directly from genlayer-js's own chain definitions — never invented network
   details.
+- **`eip6963.ts`** (new, post-launch) — EIP-6963 multi-wallet discovery. `getInjectedProvider()` in
+  `wallet.ts` only ever reads the single `window.ethereum` slot, which is ambiguous with more than
+  one wallet extension installed (whichever extension last overwrote it wins, silently, with no way
+  for the user to pick another). `subscribeToAnnouncedProviders()` dispatches the standard
+  `eip6963:requestProvider` event and collects every compliant extension's self-announcement (name,
+  icon, a stable `rdns`, and its own provider object), so the app can discover every installed
+  wallet and let the user choose — see "Wallet Architecture" below.
 - **`milestone.ts`** (new, Phase 5) — **the one place UI code calls into the deployed contract.**
   Every write (`createMilestone`, `fundMilestone`, `acceptMilestone`, `submitWork`,
   `evaluateAndFinalize`, `releasePayment`, `refundClient`, `cancelMilestone`) and every read
@@ -94,9 +101,20 @@ instead of re-deriving it.
 
 Handled explicitly:
 
-- **Connect** — `eth_requestAccounts`, then `eth_chainId`.
-- **Auto-restore** — `eth_accounts` (no prompt) on mount, so a page refresh doesn't force a
-  reconnect if the wallet already authorized this site.
+- **Multi-wallet discovery** — `useWallet` subscribes to EIP-6963 announcements
+  (`lib/genlayer/eip6963.ts`) and exposes the result as `walletOptions: WalletOption[]`. With zero
+  wallets, `hasWallet` is false; with exactly one, `connect()` (no argument) connects to it directly
+  — the old one-wallet behavior, unchanged; with more than one, the UI
+  (`components/wallet/WalletConnectButton`) renders a picker and `connect(rdns)` is called with the
+  chosen wallet's `rdns`. Calling `connect()` with no argument while more than one wallet is
+  available surfaces a clear `ConfigError` ("choose one to connect") rather than silently picking
+  one — a caller that bypasses the picker (see `dashboard`/`profile` empty-state buttons, which now
+  render the same `WalletConnectButton` for this reason) gets an explicit error, not a wrong guess.
+  Falls back to the single legacy `window.ethereum` slot as one `"Browser Wallet"` option only when
+  no wallet announces itself via EIP-6963 (older/non-compliant extensions).
+- **Connect** — `eth_requestAccounts`, then `eth_chainId`, against whichever provider was chosen.
+- **Auto-restore** — tries `eth_accounts` (no prompt) against every discovered wallet on mount, so a
+  page refresh doesn't force a reconnect regardless of which wallet the user last connected with.
 - **Account changed** — the injected provider's `accountsChanged` event updates `address` live; an
   empty array (the user disconnected all accounts in their wallet) clears state, matching
   "disconnect" handling.
@@ -109,10 +127,16 @@ Handled explicitly:
 - **Unsupported wallet** — an injected provider that throws EIP-1193 code `4200` ("Unsupported
   Method") or an equivalent "not supported" message is classified as `UNSUPPORTED_WALLET`.
 
-**Why EIP-1193 / MetaMask-compatible, not a GenLayer-specific wallet SDK**: unchanged from Phase 3 —
+**Why EIP-1193 (any compliant wallet), not a GenLayer-specific wallet SDK**: unchanged from Phase 3 —
 confirmed directly against genlayer-js's `ClientConfig.provider: EthereumProvider` shape, which is
-exactly `window.ethereum`. A dedicated `genlayer-wallet` package exists as a possible future
-enhancement but isn't required by the SDK.
+exactly what every EIP-1193 wallet exposes. A dedicated `genlayer-wallet` package exists as a
+possible future enhancement but isn't required by the SDK. **Why EIP-6963 on top of that**: EIP-1193
+alone says nothing about *which* wallet's provider ends up at `window.ethereum` when more than one
+extension is installed — EIP-6963 is the standardized discovery layer that fixes exactly that gap,
+without requiring a WalletConnect-style external project ID or a new runtime dependency (it's a
+plain browser `CustomEvent` convention). A WalletConnect (or similar) integration remains a
+possible future enhancement for mobile-wallet support specifically, since neither EIP-1193 nor
+EIP-6963 covers a wallet that isn't a browser extension.
 
 Address display: `shortenAddress` (`0x1234…abcd`, Phase 3, unit-tested). Network display: the
 connected wallet's `chainId` compared against the configured chain's `id`, with the expected

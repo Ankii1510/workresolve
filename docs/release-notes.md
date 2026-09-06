@@ -42,6 +42,17 @@ for this release and belongs on the roadmap (see `README.md` "Roadmap"), not in 
   `SECURITY.md`.
 - An MIT `LICENSE` (added this phase).
 
+## Post-launch fixes (after initial testnet + frontend deployment)
+
+- **EIP-6963 multi-wallet discovery.** The wallet connect flow previously read only the single,
+  ambiguous `window.ethereum` slot — with more than one wallet extension installed, whichever one
+  last overwrote it won, silently, with no way to pick another. `lib/genlayer/eip6963.ts` now
+  discovers every EIP-6963-compliant installed wallet, and `components/wallet/WalletConnectButton`
+  shows a picker whenever more than one is available (falls back to a single "Browser Wallet" legacy
+  option when none announce via EIP-6963). No new dependency or external service — this is a plain
+  browser event convention (see `docs/frontend.md` "Wallet Architecture"). Test suite grew from
+  144/144 to 148/148 frontend unit tests as part of this fix.
+
 ## What's explicitly NOT in v0.1.0-testnet
 
 - No live deployment. No contract address exists on any network. No production frontend URL

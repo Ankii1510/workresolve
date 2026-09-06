@@ -78,7 +78,8 @@ permissionless GenLayer evaluation with an explicit prompt-injection defense (ev
 treated as untrusted content, never as instructions); consensus-gated, structured
 per-requirement results; on-chain-derived reputation with a documented formula; a local per-wallet
 transaction/activity log; a full transaction-lifecycle UI (never shows success before real
-confirmation); a verified production CSP and security headers; 234 passing tests across the
+confirmation); a verified production CSP and security headers; EIP-6963 multi-wallet discovery (no
+single vendor's wallet hardcoded); 238 passing tests across the
 frontend and contract layers.
 
 ## Live Demo

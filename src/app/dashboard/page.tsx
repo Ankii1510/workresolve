@@ -14,6 +14,7 @@ import {
 import { describeEvaluationStage, describeLastAction, hasFundsLocked } from "@/lib/genlayer/milestoneDisplay";
 import { describeDeadline } from "@/lib/genlayer/deadline";
 import { WalletStatus } from "@/components/wallet/WalletStatus";
+import { WalletConnectButton } from "@/components/wallet/WalletConnectButton";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -115,7 +116,7 @@ export default function DashboardPage() {
           <EmptyState
             title="Connect your wallet to see your milestones"
             description="Your dashboard will show milestones where you're the client or the freelancer once you connect."
-            action={<Button onClick={wallet.connect}>Connect Wallet</Button>}
+            action={<WalletConnectButton />}
           />
         </div>
       ) : (

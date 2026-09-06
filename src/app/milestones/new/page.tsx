@@ -163,7 +163,7 @@ export default function CreateMilestonePage() {
                 value={freelancer}
                 onChange={(e) => setFreelancer(e.target.value)}
                 placeholder="0x…"
-                hint="A GenLayer wallet address (EIP-1193 / MetaMask-compatible, 0x + 40 hex characters)."
+                hint="A GenLayer wallet address (any EIP-1193 wallet, 0x + 40 hex characters)."
               />
               <div className="grid gap-4 sm:grid-cols-2">
                 <Input
