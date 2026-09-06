@@ -1,0 +1,20 @@
+# Dependencies for working on the WorkResolve Intelligent Contract.
+#
+# NOTE ON `genlayer`: the real GenVM runtime package is NOT pip-installable
+# in a normal Python environment — `genlayer` on PyPI is a placeholder
+# (`genlayer==0.0.1`, "a minimal empty package"). The actual runtime is
+# provided by GenVM itself when a contract is deployed (declared via the
+# `# { "Depends": "py-genlayer:<hash>" }` header at the top of
+# contracts/workresolve.py), and by GenLayer Studio / a testnet node when
+# running gltest. There is deliberately no `genlayer` pin below — installing
+# it here would install the placeholder and create a false sense that the
+# real SDK is available locally. See docs/contracts.md "Known Limitations".
+
+# Real GenVM contract testing framework (gltest CLI + pytest plugin).
+# Confirmed real package, inspected directly during Phase 4 research.
+genlayer-test==0.1.1
+
+# Used only by contracts/tests_logic/ (pure-Python, GenVM-free unit tests
+# for contracts/logic/workresolve_logic.py) — these DO run in this
+# environment: `python3 -m pytest contracts/tests_logic -v`.
+pytest>=7.0

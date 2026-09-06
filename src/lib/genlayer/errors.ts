@@ -1,0 +1,171 @@
+/**
+ * Blockchain-specific error classification (Phase 5).
+ *
+ * `src/lib/utils/errors.ts`'s `toAppError` is the single funnel every catch
+ * block in the app uses; this module is where it delegates for anything
+ * that came from the GenLayer client, the injected wallet provider, or a
+ * contract revert, so those raw shapes (EIP-1193 error objects, a finalized
+ * GenLayerTransaction whose execution failed, a fetch/RPC failure) are only
+ * parsed in one place.
+ *
+ * Revert-message mapping (`friendlyRevertMessage`) is built directly from
+ * the exact `raise ValueError(...)` strings in contracts/workresolve.py —
+ * see docs/contracts.md's "Functions" table for which method raises what.
+ * Anything not matched falls back to the raw (truncated) message rather
+ * than a made-up generic one, so a real revert is never silently hidden.
+ */
+import type { AppError } from "@/types";
+
+/** Thrown by lib/genlayer/transactions.ts's sendWriteTransaction when a
+ * finalized transaction's execution failed (txExecutionResultName ===
+ * "FINISHED_WITH_ERROR"). Defined here (rather than in transactions.ts) so
+ * this module can recognize it directly in classifyBlockchainError below
+ * without a circular import. */
+export class ContractRevertError extends Error {
+  constructor(
+    public readonly rawReason: string,
+    public readonly friendlyMessage: string,
+  ) {
+    super(friendlyMessage);
+    this.name = "ContractRevertError";
+  }
+}
+
+const USER_REJECTED_CODES = new Set([4001, "ACTION_REJECTED"]);
+
+/** EIP-1193 / JSON-RPC codes and viem-style messages that mean "the wallet
+ * would not have enough native balance to cover this transaction". */
+const INSUFFICIENT_BALANCE_PATTERNS = [
+  /insufficient funds/i,
+  /insufficient balance/i,
+  /exceeds balance/i,
+];
+
+const NETWORK_ERROR_PATTERNS = [/network error/i, /failed to fetch/i, /networkerror/i, /econnrefused/i];
+const TIMEOUT_PATTERNS = [/timeout/i, /timed out/i];
+
+/** Maps a substring of a contract revert reason to a short, user-facing
+ * explanation. Order matters — more specific patterns first. Every pattern
+ * here is taken verbatim from a `raise ValueError(...)` message in
+ * contracts/workresolve.py. */
+const REVERT_MESSAGE_MAP: Array<[RegExp, string]> = [
+  [/payment has already been released/i, "Payment has already been released for this milestone."],
+  [/already been refunded/i, "This milestone has already been refunded."],
+  [/does not match the agreed amount/i, "The amount sent doesn't match this milestone's escrow amount."],
+  [/only the client who created this milestone/i, "Only the client who created this milestone can do that."],
+  [/only the assigned freelancer/i, "Only the freelancer assigned to this milestone can do that."],
+  [/only the client can cancel/i, "Only the client can cancel this milestone."],
+  [/client and freelancer must be different/i, "The client and freelancer must be different wallet addresses."],
+  [/weights must sum to 100/i, "Requirement weights must add up to exactly 100%."],
+  [/at least one requirement is required/i, "At least one requirement is required."],
+  [/requirement description cannot be empty/i, "Every requirement needs a description."],
+  [/amount must be greater than zero/i, "The escrow amount must be greater than zero."],
+  [/deadline must be a valid future/i, "The deadline must be a valid future date/time."],
+  [/approval threshold must be between/i, "The approval threshold must be between 1 and 100."],
+  [/cannot cancel an accepted milestone before its deadline/i, "This milestone can't be cancelled until its deadline has passed."],
+  [/is in state \S+, expected one of/i, "This action isn't allowed in the milestone's current state."],
+  [/does not exist/i, "This milestone doesn't exist."],
+  [/provide at least a deployed url or a repository url/i, "Provide at least a deployed URL or a repository URL."],
+  [/at most \d+ evidence items/i, "Too many evidence links — please remove some."],
+];
+
+export function friendlyRevertMessage(rawReason: string): string {
+  for (const [pattern, friendly] of REVERT_MESSAGE_MAP) {
+    if (pattern.test(rawReason)) return friendly;
+  }
+  const trimmed = rawReason.trim();
+  return trimmed.length > 200 ? `${trimmed.slice(0, 200)}…` : trimmed || "The contract rejected this transaction.";
+}
+
+/** EIP-1193 code 4200 = "Unsupported Method"; some non-MetaMask-compatible
+ * injected wallets also throw a plain "not supported"/"not a function"
+ * style message when asked for eth_requestAccounts/eth_chainId. */
+export function isUnsupportedWallet(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const code = (error as { code?: unknown }).code;
+  if (code === 4200) return true;
+  const message = extractMessage(error) ?? "";
+  return /unsupported method|not supported|is not a function/i.test(message);
+}
+
+export function isUserRejection(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const code = (error as { code?: unknown }).code;
+  if (USER_REJECTED_CODES.has(code as number | string)) return true;
+  const message = extractMessage(error);
+  return /user rejected|user denied|rejected the request/i.test(message ?? "");
+}
+
+export function isInsufficientBalance(error: unknown): boolean {
+  const message = extractMessage(error) ?? "";
+  return INSUFFICIENT_BALANCE_PATTERNS.some((p) => p.test(message));
+}
+
+export function isNetworkError(error: unknown): boolean {
+  const message = extractMessage(error) ?? "";
+  return NETWORK_ERROR_PATTERNS.some((p) => p.test(message));
+}
+
+export function isTimeoutError(error: unknown): boolean {
+  const message = extractMessage(error) ?? "";
+  return TIMEOUT_PATTERNS.some((p) => p.test(message));
+}
+
+function extractMessage(error: unknown): string | null {
+  if (typeof error === "string") return error;
+  if (error instanceof Error) return error.message;
+  if (typeof error === "object" && error !== null && "message" in error) {
+    const m = (error as { message: unknown }).message;
+    return typeof m === "string" ? m : null;
+  }
+  return null;
+}
+
+/**
+ * Classifies a raw error thrown from a GenLayer client call (readContract,
+ * writeContract, waitForTransactionReceipt, or the injected wallet
+ * provider) into an AppError. Returns null if the error doesn't match any
+ * blockchain-specific shape, so the generic `toAppError` fallback in
+ * src/lib/utils/errors.ts can still handle it.
+ */
+export function classifyBlockchainError(error: unknown): AppError | null {
+  if (error instanceof ContractRevertError) {
+    return { code: "CONTRACT_ERROR", message: error.friendlyMessage, cause: error };
+  }
+  if (isUserRejection(error)) {
+    return { code: "USER_REJECTED", message: "Transaction was rejected in your wallet.", cause: error };
+  }
+  if (isUnsupportedWallet(error)) {
+    return {
+      code: "UNSUPPORTED_WALLET",
+      message: "Your wallet doesn't support the method WorkResolve needs. Try a MetaMask-compatible wallet.",
+      cause: error,
+    };
+  }
+  if (isInsufficientBalance(error)) {
+    return {
+      code: "INSUFFICIENT_BALANCE",
+      message: "Your wallet doesn't have enough balance to cover this transaction.",
+      cause: error,
+    };
+  }
+  if (isTimeoutError(error)) {
+    return {
+      code: "TRANSACTION_TIMEOUT",
+      message: "The transaction is taking longer than expected to confirm. It may still complete — check back shortly.",
+      cause: error,
+    };
+  }
+  if (isNetworkError(error)) {
+    return {
+      code: "RPC_ERROR",
+      message: "Couldn't reach the GenLayer network. Check your connection and try again.",
+      cause: error,
+    };
+  }
+  const message = extractMessage(error);
+  if (message && /revert|value error|raise/i.test(message)) {
+    return { code: "CONTRACT_ERROR", message: friendlyRevertMessage(message), cause: error };
+  }
+  return null;
+}
