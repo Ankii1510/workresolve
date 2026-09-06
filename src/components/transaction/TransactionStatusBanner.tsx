@@ -11,6 +11,19 @@ const STATUS_COPY: Record<TransactionStatus, string> = {
   FAILED: "Transaction failed.",
 };
 
+/** A client-side timeout waiting for GenLayer's FINALIZED status is not
+ * evidence the transaction failed — see lib/genlayer/transactions.ts's
+ * WAIT_FOR_RECEIPT_* constants and errors.ts's TRANSACTION_TIMEOUT code.
+ * useTransaction still reports this as status "FAILED" (it genuinely
+ * doesn't know the outcome), but this banner must not tell the user their
+ * transaction failed when it may well still finalize — that's exactly the
+ * kind of false alarm that risks a panicked, uncertain re-submission this
+ * project's own transaction-safety rules (docs/security.md, "never
+ * auto-resend uncertain transactions") exist to prevent. */
+function isUnresolvedTimeout(status: TransactionStatus, error: AppError | null): boolean {
+  return status === "FAILED" && error?.code === "TRANSACTION_TIMEOUT";
+}
+
 export interface TransactionContext {
   /** Human label for what this transaction does, e.g. "Fund Escrow". */
   action: string;
@@ -52,7 +65,8 @@ export function TransactionStatusBanner({
   if (status === "IDLE") return null;
 
   const isPending = status === "WAITING_FOR_SIGNATURE" || status === "SUBMITTING" || status === "CONFIRMING";
-  const tone = status === "SUCCESS" ? "success" : status === "FAILED" ? "danger" : "neutral";
+  const unresolvedTimeout = isUnresolvedTimeout(status, error);
+  const tone = status === "SUCCESS" ? "success" : status === "FAILED" && !unresolvedTimeout ? "danger" : "neutral";
 
   const toneClasses = {
     success: "border-emerald-200 bg-emerald-50 text-emerald-800",
@@ -75,13 +89,21 @@ export function TransactionStatusBanner({
             {context.wallet && <Item label="Wallet" value={context.wallet} />}
           </dl>
         )}
-        <p className="font-medium">{STATUS_COPY[status]}</p>
+        <p className="font-medium">
+          {unresolvedTimeout ? "Still confirming — didn't hear back in time." : STATUS_COPY[status]}
+        </p>
         {status === "FAILED" && error && <p className="mt-0.5 break-words">{error.message}</p>}
         {hash && (
           <div className="mt-0.5 flex flex-wrap items-center gap-2">
             <p className="font-mono text-xs break-all opacity-75">tx: {hash}</p>
             <ExplorerLink />
           </div>
+        )}
+        {unresolvedTimeout && hash && (
+          <p className="mt-1 text-xs opacity-75">
+            This app stopped checking, but the transaction itself may still be processing on GenLayer
+            — check its status on the explorer above before assuming it needs to be redone.
+          </p>
         )}
       </div>
     </div>

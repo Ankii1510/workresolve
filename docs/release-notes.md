@@ -53,6 +53,17 @@ for this release and belongs on the roadmap (see `README.md` "Roadmap"), not in 
   browser event convention (see `docs/frontend.md` "Wallet Architecture"). Test suite grew from
   144/144 to 149/149 frontend unit tests as part of this fix.
 
+- **Transaction confirmation timeout increased; "failed" no longer shown for an unresolved wait.**
+  The first real write against the live Asimov testnet (create_milestone) was still processing
+  according to GenLayer's own explorer well past 30 seconds, but this app gave up waiting after
+  genlayer-js's own default (`waitInterval: 3000ms x retries: 10`) and showed "Transaction failed."
+  — alarming and inaccurate, since the transaction was never actually rejected on-chain.
+  `lib/genlayer/transactions.ts` now waits up to 5 minutes (5s interval x 60 retries) before giving
+  up, and `TransactionStatusBanner` no longer shows the "Transaction failed" heading or red/danger
+  styling for a `TRANSACTION_TIMEOUT` specifically — it shows "Still confirming — didn't hear back
+  in time." instead, with a note to check the explorer before assuming a redo is needed. Test suite
+  grew from 149/149 to 152/152 frontend unit tests as part of this fix.
+
 ## What's explicitly NOT in v0.1.0-testnet
 
 - No live deployment. No contract address exists on any network. No production frontend URL

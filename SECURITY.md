@@ -8,7 +8,7 @@ frontend, GenLayer evaluation, with severity ratings), see [`docs/security.md`](
 
 **This contract has not been formally audited by a third-party security firm.** Every claim of
 "tested" or "verified" in this repository refers to this project's own test suite (90/90 contract
-logic tests, 149/149 frontend unit tests — see `docs/security.md` and `docs/release-checklist.md`)
+logic tests, 152/152 frontend unit tests — see `docs/security.md` and `docs/release-checklist.md`)
 and manual code review, not an independent professional audit. Do not treat this software as
 audited in the industry sense of that word.
 

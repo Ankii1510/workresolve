@@ -18,12 +18,24 @@
  *     contract-side revert; `consensus_data.leader_receipt[]` carries each
  *     validator's own `error` string when the execution failed.
  *
- * IMPORTANT — this has never been exercised against a live GenLayer network
- * from this development environment (see docs/contracts.md "Known
- * Limitations": no reachable Docker daemon, no network egress to
- * genlayer.com domains here). The shapes above are taken from the SDK's own
- * shipped type declarations, not observed from a real response.
+ * `interval`/`retries` on `waitForTransactionReceipt`: left unspecified
+ * this inherits genlayer-js's own default (`transactionsConfig` in the
+ * installed package — 3s interval x 10 retries = 30s total), confirmed by
+ * reading the installed package's own source
+ * (node_modules/genlayer-js/dist/index.js). The first real write against
+ * the live Asimov testnet (a plain create_milestone call, deployment tx
+ * 0xbcb132...) was still showing "Sending" (not yet finalized) in
+ * GenLayer's own explorer well past that 30s window — real multi-validator
+ * consensus on a public testnet is legitimately slower than genlayer-js's
+ * conservative default assumes. Overriding both here to 5s x 60 (5 minutes
+ * total) so a normal write has a realistic chance to actually finalize
+ * before this throws — a client-side timeout after 30s was never evidence
+ * the transaction failed (see errors.ts's TRANSACTION_TIMEOUT handling and
+ * TransactionStatusBanner's separate, non-alarming treatment of it), just
+ * evidence this app gave up checking too early.
  */
+const WAIT_FOR_RECEIPT_INTERVAL_MS = 5000;
+const WAIT_FOR_RECEIPT_RETRIES = 60;
 import { TransactionStatus, type GenLayerTransaction, type TransactionHash } from "genlayer-js/types";
 import type { AppGenLayerClient } from "./client";
 import { ContractRevertError, friendlyRevertMessage } from "./errors";
@@ -69,6 +81,8 @@ export async function sendWriteTransaction(
   const receipt = await client.waitForTransactionReceipt({
     hash: txHash,
     status: TransactionStatus.FINALIZED,
+    interval: WAIT_FOR_RECEIPT_INTERVAL_MS,
+    retries: WAIT_FOR_RECEIPT_RETRIES,
   });
 
   if (receipt.txExecutionResultName === "FINISHED_WITH_ERROR") {
