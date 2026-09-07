@@ -5,27 +5,38 @@ stands today are listed — nothing here is a generic disclaimer.
 
 ## Environment / verification
 
-- **RESOLVED, and the real reason two prior deployments never actually worked: a GenVM
-  "runner-comment" parsing bug in this file's own header, not a validator/consensus issue.**
-  Both the original deployment (`0x9F3B3360a4219A276ba76600e1CCD7B924eDC6C0`) and the first
-  reviewer-driven redeployment (`0x7BB7A6D936Fd72149424AE3681304dBc4E575B79`) returned what looked
-  like a normal success (a contract address and a transaction hash) from `genlayer deploy`, but
-  neither ever actually worked: every subsequent read (`get_milestones_by_client`/`_by_freelancer`)
-  failed with GenLayer's raw RPC error "Requested resource not found." (EIP-1474 code `-32001`), and
-  every write (e.g. `create_milestone`) finalized with `txExecutionResultName: FINISHED_WITH_ERROR`.
-  Root-caused using `genlayer receipt <deployTxHash>` (showed the *deployment transaction itself*
-  finalized with `FINISHED_WITH_ERROR`, meaning `__init__` never actually completed) and
-  `genlayer trace <deployTxHash>` (showed the GenVM-level cause directly: `invalid_contract` —
-  `"trailing characters at line 1 column 36"`, column 36 being exactly one character past the closing
-  brace of this file's `# { "Depends": "py-genlayer:test" }` header). GenVM concatenates every
-  *contiguous* leading `#` comment line (no blank line between them) into a single "runner comment"
-  block and parses the whole thing as one JSON document — `genlayer-cli`'s own bundled template
-  (`football_bets.py`) puts a blank line immediately after the Depends comment for exactly this
-  reason, and this file did not, so its ~60-line documentation preamble was glued onto the Depends
-  JSON and produced a parse error before a single line of `__init__` could run. **Fixed** by adding
-  the required blank line (see the top of `contracts/workresolve.py` for the in-file explanation).
-  This means a **third deployment is required** — both addresses above are, and will always be, dead
-  (no code was ever successfully committed to either). See `docs/release-notes.md` for the new
+- **RESOLVED, and the real reason three straight deployments never actually worked: two separate
+  GenVM-level bugs in this file's own header comment, not a validator/consensus issue.** The
+  original deployment (`0x9F3B3360a4219A276ba76600e1CCD7B924eDC6C0`), the first reviewer-driven
+  redeployment (`0x7BB7A6D936Fd72149424AE3681304dBc4E575B79`), and a second redeployment
+  (`0x8366417A85498fF3Ff8012E85Ab2DE7d6FE83b16`) each returned what looked like a normal success (a
+  contract address and a transaction hash) from `genlayer deploy`, but none of them ever actually
+  worked: every subsequent read (`get_milestones_by_client`/`_by_freelancer`) failed with GenLayer's
+  raw RPC error "Requested resource not found." (EIP-1474 code `-32001`), and every write (e.g.
+  `create_milestone`) finalized with `txExecutionResultName: FINISHED_WITH_ERROR`. Root-caused using
+  `genlayer receipt <deployTxHash>` (showed the *deployment transaction itself* finalized with
+  `FINISHED_WITH_ERROR`, meaning `__init__` never actually completed) and
+  `genlayer trace <deployTxHash>` (showed the exact GenVM-level cause each time), in two rounds:
+  1. **Comment-concatenation parse bug** (hit by the first two deployments): `invalid_contract` —
+     `"trailing characters at line 1 column 36"`, column 36 being exactly one character past the
+     closing brace of this file's `# { "Depends": ... }` header. GenVM concatenates every
+     *contiguous* leading `#` comment line (no blank line between them) into a single "runner
+     comment" block and parses the whole thing as one JSON document — `genlayer-cli`'s own bundled
+     template (`football_bets.py`) puts a blank line immediately after the Depends comment for
+     exactly this reason, and this file did not, so its ~60-line documentation preamble was glued
+     onto the Depends JSON. **Fixed** by adding the required blank line.
+  2. **Invalid runner id** (hit by the third deployment, once the parse bug above was fixed):
+     `invalid_contract` — `"invalid runner id: py-genlayer:test"`, preceded by the warning
+     `":test/ :latest runner used in non-debug mode, this is not allowed"`. `py-genlayer:test` (used
+     by this file, `genlayer-cli`'s own bundled template, and most public tutorials) is only a valid
+     runner id in GenVM's local Studio/simulator *debug* mode — GenLayer's public Asimov Testnet runs
+     in non-debug mode and requires a real, pinned runner version hash. **Fixed** by switching to
+     `py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6`, the hash GenLayer's own
+     documentation cites verbatim on both its introduction and upgradability pages.
+
+  See the top of `contracts/workresolve.py` for the in-file explanation of both. This means a
+  **fourth deployment is required** — all three addresses above are, and will always be, dead (no
+  code was ever successfully committed to any of them). See `docs/release-notes.md` for the new
   address once redeployed.
 - **`classifyBlockchainError` (`src/lib/genlayer/errors.ts`) now recognizes GenLayer's raw
   "Requested resource not found." RPC error (code `-32001`) instead of showing it verbatim** — this

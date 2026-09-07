@@ -1,21 +1,39 @@
-# { "Depends": "py-genlayer:test" }
+# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
-# GENVM RUNNER-COMMENT PARSING — DO NOT REMOVE THE BLANK LINE ABOVE (found
-# the hard way; see docs/limitations.md and docs/release-notes.md "Post-
-# launch fixes"). GenVM concatenates every *contiguous* leading '#' comment
-# line (no blank line between them) into a single "runner comment" block
-# and tries to parse the whole thing as one JSON document. genlayer-cli's
-# own bundled template (football_bets.py) puts a blank line immediately
-# after the "Depends" comment for exactly this reason. This file previously
-# did not, so its ~60-line documentation preamble got glued onto the
-# Depends JSON, producing a parse error ("trailing characters at line 1
-# column 36" — column 36 is exactly one past the Depends JSON's closing
-# brace) that silently made every past deployment of this contract
-# execute-with-error at deploy time, before a single line of __init__ ever
-# actually ran — this is why every write against both prior deployments
-# failed, and why get_milestones_by_client/_by_freelancer reads returned
-# GenLayer's raw "contract code not found" error: there never was a
-# successfully deployed contract at either address to read or write.
+# GENVM RUNNER ID — DO NOT CHANGE WITHOUT READING THIS (found the hard way;
+# see docs/limitations.md and docs/release-notes.md "Post-launch fixes").
+# `py-genlayer:test` (this file's Depends value through three straight
+# failed deployments) is only a valid runner id in GenVM's local
+# Studio/simulator DEBUG mode. `genlayer trace <deployTxHash>` on GenLayer's
+# public Asimov Testnet showed the exact GenVM-level rejection: `vm error:
+# invalid_contract`, cause `"invalid runner id: py-genlayer:test"`, preceded
+# by the warning `":test/ :latest runner used in non-debug mode, this is
+# not allowed"`. The public testnet runs in non-debug mode and requires a
+# real, pinned runner version hash — not the generic "test"/"latest"
+# aliases genlayer-cli's own bundled template and most tutorials use (those
+# examples only ever ran against localnet/Studio). The hash above is the
+# one GenLayer's own documentation cites for a real deployment (see
+# https://docs.genlayer.com/developers/intelligent-contracts/introduction
+# and .../features/upgradability, both of which use it verbatim).
+#
+# GENVM RUNNER-COMMENT PARSING — DO NOT REMOVE THE BLANK LINE ABOVE THIS
+# COMMENT BLOCK EITHER. GenVM concatenates every *contiguous* leading '#'
+# comment line (no blank line between them) into a single "runner comment"
+# block and tries to parse the whole thing as one JSON document. This
+# file's Depends comment must be followed by a blank line before any more
+# '#' lines, exactly like genlayer-cli's own bundled template
+# (football_bets.py) does — otherwise `genlayer trace` reports
+# `invalid_contract`, cause `"trailing characters at line 1 column 36"`
+# (column 36 being exactly one past the Depends JSON's closing brace). This
+# file hit that bug first, before the runner-id bug above; both had to be
+# fixed, in this order, before a single line of __init__ could ever run —
+# which is why every write against every prior deployment
+# (0x9F3B3360a4219A276ba76600e1CCD7B924eDC6C0,
+# 0x7BB7A6D936Fd72149424AE3681304dBc4E575B79,
+# 0x8366417A85498fF3Ff8012E85Ab2DE7d6FE83b16) failed, and why
+# get_milestones_by_client/_by_freelancer reads returned GenLayer's raw
+# "contract code not found" error: there was never a successfully deployed
+# contract at any of those addresses to read or write.
 #
 # WorkResolve — GenLayer Intelligent Contract
 #
