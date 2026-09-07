@@ -189,8 +189,10 @@ export function classifyBlockchainError(error: unknown): AppError | null {
     return {
       code: "GENLAYER_UNAVAILABLE",
       message:
-        "The GenLayer network hasn't picked up this contract's latest state yet. This is expected for a " +
-        "few minutes right after a deployment or redeployment — please wait a bit and try again.",
+        "GenLayer can't find this contract's code on the network right now. Right after a deployment " +
+        "this can briefly mean the network hasn't caught up yet — wait a bit and try again. If it doesn't " +
+        "clear up, it usually means the deployment itself never finished successfully (see " +
+        "docs/limitations.md's note on GenVM's runner-comment parsing for a real example of this).",
       cause: error,
     };
   }

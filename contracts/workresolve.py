@@ -1,4 +1,21 @@
 # { "Depends": "py-genlayer:test" }
+
+# GENVM RUNNER-COMMENT PARSING — DO NOT REMOVE THE BLANK LINE ABOVE (found
+# the hard way; see docs/limitations.md and docs/release-notes.md "Post-
+# launch fixes"). GenVM concatenates every *contiguous* leading '#' comment
+# line (no blank line between them) into a single "runner comment" block
+# and tries to parse the whole thing as one JSON document. genlayer-cli's
+# own bundled template (football_bets.py) puts a blank line immediately
+# after the "Depends" comment for exactly this reason. This file previously
+# did not, so its ~60-line documentation preamble got glued onto the
+# Depends JSON, producing a parse error ("trailing characters at line 1
+# column 36" — column 36 is exactly one past the Depends JSON's closing
+# brace) that silently made every past deployment of this contract
+# execute-with-error at deploy time, before a single line of __init__ ever
+# actually ran — this is why every write against both prior deployments
+# failed, and why get_milestones_by_client/_by_freelancer reads returned
+# GenLayer's raw "contract code not found" error: there never was a
+# successfully deployed contract at either address to read or write.
 #
 # WorkResolve — GenLayer Intelligent Contract
 #

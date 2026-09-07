@@ -5,39 +5,52 @@ stands today are listed — nothing here is a generic disclaimer.
 
 ## Environment / verification
 
-- **The contract is deployed on GenLayer's real Asimov Testnet** (current address
-  `0x7BB7A6D936Fd72149424AE3681304dBc4E575B79`, tx
-  `0x60845f0b3a6d037fa327ff885ac6e666f3594475f7cf32614b99560233e4fe46` — see
-  `docs/genlayer-integration.md`), deployed via the official `genlayer` CLI from a machine with real
-  network access. This is a redeployment: the original deployment
-  (`0x9F3B3360a4219A276ba76600e1CCD7B924eDC6C0`) predates reviewer-driven fixes to the transfer
-  mechanism, deadline handling, and upgradability, and is superseded. This development sandbox itself
-  still has no `genlayer.com` network egress and no reachable Docker daemon, so the deployment and
-  any live-network testing from here on must continue to happen from a machine with real access, not
-  from this sandbox. As of this deployment, no milestone lifecycle (fund → accept → submit →
-  evaluate → settle) has yet been run against the live contract, so `evaluate_and_finalize`'s real
+- **RESOLVED, and the real reason two prior deployments never actually worked: a GenVM
+  "runner-comment" parsing bug in this file's own header, not a validator/consensus issue.**
+  Both the original deployment (`0x9F3B3360a4219A276ba76600e1CCD7B924eDC6C0`) and the first
+  reviewer-driven redeployment (`0x7BB7A6D936Fd72149424AE3681304dBc4E575B79`) returned what looked
+  like a normal success (a contract address and a transaction hash) from `genlayer deploy`, but
+  neither ever actually worked: every subsequent read (`get_milestones_by_client`/`_by_freelancer`)
+  failed with GenLayer's raw RPC error "Requested resource not found." (EIP-1474 code `-32001`), and
+  every write (e.g. `create_milestone`) finalized with `txExecutionResultName: FINISHED_WITH_ERROR`.
+  Root-caused using `genlayer receipt <deployTxHash>` (showed the *deployment transaction itself*
+  finalized with `FINISHED_WITH_ERROR`, meaning `__init__` never actually completed) and
+  `genlayer trace <deployTxHash>` (showed the GenVM-level cause directly: `invalid_contract` —
+  `"trailing characters at line 1 column 36"`, column 36 being exactly one character past the closing
+  brace of this file's `# { "Depends": "py-genlayer:test" }` header). GenVM concatenates every
+  *contiguous* leading `#` comment line (no blank line between them) into a single "runner comment"
+  block and parses the whole thing as one JSON document — `genlayer-cli`'s own bundled template
+  (`football_bets.py`) puts a blank line immediately after the Depends comment for exactly this
+  reason, and this file did not, so its ~60-line documentation preamble was glued onto the Depends
+  JSON and produced a parse error before a single line of `__init__` could run. **Fixed** by adding
+  the required blank line (see the top of `contracts/workresolve.py` for the in-file explanation).
+  This means a **third deployment is required** — both addresses above are, and will always be, dead
+  (no code was ever successfully committed to either). See `docs/release-notes.md` for the new
+  address once redeployed.
+- **`classifyBlockchainError` (`src/lib/genlayer/errors.ts`) now recognizes GenLayer's raw
+  "Requested resource not found." RPC error (code `-32001`) instead of showing it verbatim** — this
+  is what first surfaced the deployment bug above (it showed up as this raw error on the dashboard).
+  The friendly message it now shows correctly hedges both real causes: brief post-deployment network
+  lag (which does clear on its own) and a deployment that never actually finished (which does not,
+  and needs `genlayer receipt`/`genlayer trace` on the deployment tx to confirm, exactly as done
+  above). Regression tests in `src/tests/unit/errors.test.ts`.
+- **This development sandbox still has no `genlayer.com` network egress and no reachable Docker
+  daemon**, so deployment, `genlayer trace`/`genlayer receipt` calls, and any other live-network
+  command must run from a machine with real access, not from this sandbox. As of the redeployment
+  above (now known dead), no milestone lifecycle (fund → accept → submit → evaluate → settle) had
+  been run against a genuinely live contract, so `evaluate_and_finalize`'s real
   `gl.exec_prompt`/`gl.get_webpage` calls and real validator consensus remain unexercised in
   practice — every claim about contract correctness, evaluation behavior, and escrow accounting is
   still verified only at the deterministic pure-Python logic level (94/94 tests in
-  `contracts/tests_logic`) plus this one deployment transaction, not a full live run.
-- **The outbound transfer mechanism now matches GenLayer's documented API, but still needs a live-
-  network run to confirm end to end.** A GenLayer reviewer flagged the earlier
+  `contracts/tests_logic`), not a full live run, until the next deployment succeeds.
+- **The outbound transfer mechanism matches GenLayer's documented API on paper, but still needs a
+  live-network run to confirm end to end** — now blocked on the third deployment above rather than
+  by anything wrong with the mechanism itself. A GenLayer reviewer flagged the earlier
   `gl.ContractAt(...).emit_transfer(...)` call as not a real API; it has been replaced with
   `_pay_out()` / `_ExternalRecipient(...).emit_transfer(value=...)`, matching GenLayer's own "Value
-  Transfers" documentation, and shipped in the redeployment above. This is the single
-  highest-priority item to verify next against the live deployment, via
-  `contracts/tests/test_workresolve.py::TestCancelMilestone`'s two deterministic (no-LLM) refund
-  tests — see `docs/contracts.md` "Known Limitations."
-- **Reads against a just-(re)deployed contract can briefly fail with a GenLayer-side "resource not
-  found" RPC error, not an app bug.** After the redeployment above, the dashboard's
-  `get_milestones_by_client`/`_by_freelancer` reads failed with GenLayer's own raw RPC error (EIP-1474
-  code `-32001`, "Requested resource not found.") for a period afterward — most likely because the RPC
-  node serving the read hadn't yet caught up on the freshly deployed contract's state. This raw message
-  was previously shown to the user verbatim; `classifyBlockchainError`
-  (`src/lib/genlayer/errors.ts`) now recognizes it and shows a clear, accurate explanation instead
-  ("expected for a few minutes after a deployment/redeployment — try again shortly"), with regression
-  tests in `src/tests/unit/errors.test.ts`. This is a real, observed GenLayer testnet behavior right
-  after a (re)deployment, not something this app can prevent — only explain honestly while it clears.
+  Transfers" documentation. This is the single highest-priority item to verify once a working
+  deployment exists, via `contracts/tests/test_workresolve.py::TestCancelMilestone`'s two
+  deterministic (no-LLM) refund tests — see `docs/contracts.md` "Known Limitations."
 - **Wallet and browser edge cases (locked wallet, mid-session account/network switch, browser
   refresh during a pending transaction) were verified by code review, not live manual testing.** No
   browser automation was used in any phase of this project.

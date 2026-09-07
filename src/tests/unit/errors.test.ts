@@ -68,7 +68,7 @@ describe("toAppError", () => {
     const result = toAppError(new Error("Requested resource not found."));
     expect(result.code).toBe("GENLAYER_UNAVAILABLE");
     expect(result.message).not.toBe("Requested resource not found.");
-    expect(result.message).toMatch(/deployment|redeployment/i);
+    expect(result.message).toMatch(/deployment/i);
   });
 
   it("maps a -32001 coded RPC error object to GENLAYER_UNAVAILABLE even without the exact message", () => {
