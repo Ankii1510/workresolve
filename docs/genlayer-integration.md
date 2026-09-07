@@ -90,13 +90,22 @@ centralized or absent.
   deterministic core (see that file's own docstring for why the split exists).
 - **Contract address / network**: deployed to **GenLayer Asimov Testnet** (alias `testnet-asimov`,
   chain id `4221`, RPC `https://rpc-asimov.genlayer.com`).
-  - Contract address: `0x9F3B3360a4219A276ba76600e1CCD7B924eDC6C0`
+  - Contract address (original deployment — **redeployment pending**, see below):
+    `0x9F3B3360a4219A276ba76600e1CCD7B924eDC6C0`
   - Deployment transaction: `0xbcb13223a03a32a23adf217727adcc6884002d08c2e98c44fbebf2a19ced72dc`
   - Explorer: https://explorer-asimov.genlayer.com/ (search the address or transaction hash above)
   - Deployed via the official `genlayer` CLI (`genlayer deploy --contract workresolve.py`) from a
     machine with real network access — this development sandbox itself has no `genlayer.com`
     network egress (see `docs/limitations.md`), so deployment was performed outside it, not by
     disabling or working around that restriction.
+  - **Redeployment pending**: a GenLayer reviewer's feedback on the submission required contract-code
+    fixes (confirmed native-transfer mechanism, deadline-gated submission, and upgradability — see
+    `docs/release-notes.md` "Post-launch fixes" and `docs/contracts.md` "Escrow Architecture" /
+    "Upgradability"). None of this takes effect on the address above; a fresh deployment (same
+    `genlayer deploy --contract workresolve.py` process) is required and will produce a new address,
+    which this section and `README.md`/`docs/submission.md` will be updated with once it happens.
+    Thanks to the new upgradability mechanism, this should be the last time a fix requires a new
+    address — future fixes can go through `upgrade()` instead.
 - **Relevant contract methods**: `evaluate_and_finalize` (the one GenLayer-dependent method —
   `contracts/workresolve.py`, search for `gl.get_webpage`/`gl.exec_prompt`/
   `gl.eq_principle_prompt_comparative`); `compute_score`/`decide` (the deterministic consumers of

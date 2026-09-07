@@ -89,6 +89,25 @@ for this release and belongs on the roadmap (see `README.md` "Roadmap"), not in 
   that file's own module docstring for exact run instructions and an honest breakdown of which tests
   are deterministic versus LLM-dependent.
 
+- **Upgradability added.** Fixing the two issues above required a brand-new deployment to a
+  brand-new address — updating the frontend's env var, every doc citing the contract address, and
+  the reviewer's own record of the submission. To avoid repeating that for the *next* fix, the
+  contract now opts into GenLayer's own confirmed in-place upgrade mechanism: `__init__` registers
+  the deploying account as the sole upgrader, `upgrade(new_code: bytes)` replaces the contract's code
+  while keeping its address and all storage intact, and `get_upgraders()` lets anyone verify on-chain
+  who holds this power. See `docs/contracts.md` "Upgradability" for the full mechanism and the
+  security tradeoff it deliberately accepts. Covered by a new `TestUpgradability` class in
+  `contracts/tests/test_workresolve.py` (needs a live network to run, same as the rest of that file).
+
+- **PENDING: this fix requires a fresh deployment.** All of the above — the corrected transfer
+  mechanism, the deadline fix, and upgradability itself — only take effect once deployed; GenLayer
+  contracts cannot be modified after deployment unless upgradability was already in place *before*
+  that deployment, which the original `0x9F3B3360a4219A276ba76600e1CCD7B924eDC6C0` deployment was
+  not. A new deployment (via the same `genlayer deploy --contract workresolve.py` process as the
+  original one) is required, which will produce a new contract address. Once deployed, this address
+  becomes the last one this project should ever need to change for a contract-logic fix, thanks to
+  the upgrade mechanism above. See "Blockers to v1.0.0" below for the current status.
+
 ## What's explicitly NOT in v0.1.0-testnet
 
 - No live deployment. No contract address exists on any network. No production frontend URL
@@ -101,20 +120,23 @@ for this release and belongs on the roadmap (see `README.md` "Roadmap"), not in 
 
 ## Blockers to v1.0.0
 
-1. ~~A real contract deployment to a GenLayer network~~ — **done.** Deployed to GenLayer Asimov
-   Testnet (`testnet-asimov`, chain id `4221`) via the official `genlayer` CLI, from a machine with
-   real network access (this development sandbox itself still has no `genlayer.com` egress — see
-   `docs/limitations.md`).
-   - Contract address: `0x9F3B3360a4219A276ba76600e1CCD7B924eDC6C0`
-   - Deployment transaction: `0xbcb13223a03a32a23adf217727adcc6884002d08c2e98c44fbebf2a19ced72dc`
-   - Explorer: https://explorer-asimov.genlayer.com/
+1. ~~A real contract deployment to a GenLayer network~~ — **done, but superseded.** The original
+   deployment (address `0x9F3B3360a4219A276ba76600e1CCD7B924eDC6C0`, tx
+   `0xbcb13223a03a32a23adf217727adcc6884002d08c2e98c44fbebf2a19ced72dc`) was deployed to GenLayer
+   Asimov Testnet (`testnet-asimov`, chain id `4221`) via the official `genlayer` CLI, from a machine
+   with real network access (this development sandbox itself still has no `genlayer.com` egress —
+   see `docs/limitations.md`). **A fresh deployment is now required** to carry the reviewer-driven
+   fixes (confirmed transfer mechanism, deadline gating, upgradability) onto the live network — see
+   the "PENDING" note in "Post-launch fixes" above. `docs/genlayer-integration.md` and this section
+   will be updated with the new address once that redeployment happens.
 2. A real two-wallet APPROVE flow and REJECT flow, executed and recorded with actual transaction
-   hashes. **Still pending.**
-3. ~~A deployed, publicly reachable production frontend pointed at that contract~~ — **done.** Live
-   at https://workresolve.vercel.app/, deployed on Vercel and configured with
-   `NEXT_PUBLIC_WORKRESOLVE_CONTRACT_ADDRESS` pointed at the deployed contract (verified: the
-   Create Milestone form loads with no "not configured" error).
+   hashes. **Still pending** — needs the fresh deployment above first.
+3. ~~A deployed, publicly reachable production frontend pointed at that contract~~ — **done, needs
+   re-pointing.** Live at https://workresolve.vercel.app/, deployed on Vercel and configured with
+   `NEXT_PUBLIC_WORKRESOLVE_CONTRACT_ADDRESS` pointed at the original deployed contract (verified:
+   the Create Milestone form loads with no "not configured" error). This env var will need updating
+   to the new contract address once the fresh deployment above happens.
 
 Items 1 and 3 were deployment/infrastructure actions, not code changes, and required an environment
 with real network access, which this development sandbox does not have — both were performed from
-the project owner's own machine. Item 2 remains.
+the project owner's own machine, and the redeployment above will be too. Item 2 remains.

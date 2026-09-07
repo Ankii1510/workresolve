@@ -25,8 +25,8 @@ Run for real with:
 The scenario matrix below follows the Phase 4 spec's requested coverage:
 creation, funding, acceptance, submission, evaluation, settlement,
 requirement immutability, and deadline/cancellation — plus double-settlement
-protection and a full happy-path integration test exercising every state in
-sequence.
+protection, a full happy-path integration test exercising every state in
+sequence, and (added after reviewer feedback) upgradability.
 
 FUNDED-LIFECYCLE COVERAGE, AND WHICH PARTS ARE DETERMINISTIC: this file
 covers all three ways an escrow's funds leave the contract —
@@ -53,9 +53,13 @@ report the real pass/skip/fail counts from that run — do not report only
 the deterministic subset as if it were the whole suite.
 """
 
+from pathlib import Path
+
 import pytest
 from gltest import get_contract_factory, default_account, create_account
 from gltest.assertions import tx_execution_succeeded, tx_execution_failed
+
+CONTRACT_SOURCE = Path(__file__).resolve().parent.parent / "workresolve.py"
 
 REQUIREMENT_DESCRIPTIONS = [
     "Responsive landing page",
@@ -597,3 +601,40 @@ class TestFullLifecycleIntegration:
             final_milestone = deployed.get_milestone(args=[milestone_id])
             assert final_milestone["state"] == "REFUNDED"
             assert final_milestone["refunded"] is True
+
+
+# ---------------------------------------------------------------------------
+# Upgradability — added so a future fix never again needs a brand-new
+# deployment (and therefore a new address every downstream system has to be
+# updated to point at) the way this reviewer-driven round of fixes did.
+# ---------------------------------------------------------------------------
+
+
+class TestUpgradability:
+    def test_deployer_is_registered_as_the_initial_upgrader(self, deployed, client_account):
+        upgraders = deployed.get_upgraders(args=[])
+        assert client_account.address in upgraders
+
+    def test_non_upgrader_cannot_call_upgrade(self, deployed, freelancer_account):
+        new_code = CONTRACT_SOURCE.read_bytes()
+        response = deployed.connect(freelancer_account).upgrade(args=[new_code])
+        assert tx_execution_failed(response)  # GenVM itself rejects this — see upgrade()'s docstring
+        # Confirm nothing changed: the freelancer was never added as an upgrader.
+        assert freelancer_account.address not in deployed.get_upgraders(args=[])
+
+    def test_upgrader_can_reupgrade_with_same_code_and_storage_survives(self, deployed, freelancer_account):
+        """Re-deploying the contract's own current source is the safest
+        possible upgrade to test here (no storage-layout change at all —
+        see upgrade()'s docstring on storage compatibility), and is enough
+        to prove the mechanism itself works: the milestone created before
+        the upgrade must still read back identically afterward, from the
+        same address, with no redeployment."""
+        _create_milestone(deployed, freelancer_account.address)
+        new_code = CONTRACT_SOURCE.read_bytes()
+
+        response = deployed.upgrade(args=[new_code])
+        assert tx_execution_succeeded(response)
+
+        milestone = deployed.get_milestone(args=["1"])
+        assert milestone["state"] == "CREATED"
+        assert milestone["freelancer"] == freelancer_account.address

@@ -126,10 +126,16 @@ Only what's actually implemented and tested:
 
 - **Network**: GenLayer Asimov Testnet (alias `testnet-asimov`, chain id `4221`) — see
   `src/lib/genlayer/config.ts`.
-- **Contract**: deployed. Address: `0x9F3B3360a4219A276ba76600e1CCD7B924eDC6C0`. Deployment
-  transaction: `0xbcb13223a03a32a23adf217727adcc6884002d08c2e98c44fbebf2a19ced72dc`. Deployed via the
-  official `genlayer` CLI from a machine with real network access — see
-  [`docs/genlayer-integration.md`](./docs/genlayer-integration.md) "GenLayer-specific proof."
+- **Contract**: the address below reflects the *original* deployment and is pending redeployment — a
+  GenLayer reviewer's feedback on the submission required contract-code fixes (confirmed transfer
+  mechanism, deadline gating, upgradability — see `docs/release-notes.md` "Post-launch fixes"), and
+  a fresh `genlayer deploy` is needed to carry them onto the live network. Address:
+  `0x9F3B3360a4219A276ba76600e1CCD7B924eDC6C0`. Deployment transaction:
+  `0xbcb13223a03a32a23adf217727adcc6884002d08c2e98c44fbebf2a19ced72dc`. Deployed via the official
+  `genlayer` CLI from a machine with real network access — see
+  [`docs/genlayer-integration.md`](./docs/genlayer-integration.md) "GenLayer-specific proof." This
+  section will be updated with the new address once the redeployment happens; thanks to the new
+  upgradability mechanism, this should be the last time a fix requires a new address.
 - **Explorer**: https://explorer-asimov.genlayer.com/ (search the contract address or transaction
   hash above); `src/lib/genlayer/explorer.ts` derives the same URL from the selected chain's
   metadata.

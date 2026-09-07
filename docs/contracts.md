@@ -265,6 +265,42 @@ earlier, invented `gl.ContractAt(recipient).emit_transfer(amount)` call — flag
 reviewer as not a real API — which was built from an unconfirmed guess rather than documented
 behavior. `gl.ContractAt` does not exist anywhere in GenLayer's real API.
 
+## Upgradability
+
+Added in the same reviewer-driven round of fixes as the transfer-mechanism and deadline fixes above,
+for a direct reason: fixing this contract required a brand-new deployment to a brand-new address —
+which in turn required updating the frontend's `NEXT_PUBLIC_WORKRESOLVE_CONTRACT_ADDRESS`, every doc
+that cites the contract address, and the reviewer's own record of the submission. With upgradability
+in place, the *next* fix can instead be pushed to the same address.
+
+This is GenLayer's own confirmed mechanism, taken verbatim from its "Upgradability" docs page
+(https://docs.genlayer.com/developers/intelligent-contracts/features/upgradability):
+
+- `__init__` calls `root.upgraders.get().append(gl.message.sender_address)`, registering the
+  deploying account as the sole initial upgrader. GenVM's own initialization automatically locks the
+  upgraders slot (and the code slot, and a few others) against anyone not already on that list — this
+  contract does not implement that restriction itself; it is enforced by the runtime.
+- `upgrade(new_code: bytes)` replaces the contract's code in place — `root.code.get()`, then
+  `.truncate()` + `.extend(new_code)` — while the contract's address and all existing storage
+  (milestones, escrowed funds, reputation counters) stay exactly as they were. Calling it from a
+  non-upgrader address fails with GenVM's own `VMError` before this method's body ever runs.
+- `get_upgraders()` is a public view returning the current upgrader list, so anyone can verify
+  on-chain, at any time, exactly which address(es) hold this power — not just trust an off-chain
+  claim about it.
+
+**Security tradeoff, stated plainly** (see `upgrade()`'s own docstring for the same point in the
+code): an upgrader can replace this contract's logic entirely, including its own escrow and transfer
+methods — that is real, permanent power over a contract holding real escrowed funds. This project
+accepts that tradeoff because the sole upgrader is the same deploying account that already controls
+where funds go via `create_milestone`'s freelancer field; it does not introduce a new trusted party.
+**Storage compatibility is not automatic**: GenLayer's own docs state "the new code must understand
+the existing storage layout" — an upgrade that changes a stored field's shape would need a migration
+step of its own, which this project has never needed and has not built or exercised.
+`contracts/tests/test_workresolve.py::TestUpgradability` covers the confirmed happy path (the
+deployer is the initial upgrader, a non-upgrader's `upgrade()` call fails, and storage survives a
+same-code upgrade) but — like the rest of the gltest suite — needs a live GenVM network to actually
+run; see that file's own module docstring.
+
 ## Deadline & Timeout Handling
 
 Deliberately simple, per the Phase 2/4 "no complex arbitration" instruction:
