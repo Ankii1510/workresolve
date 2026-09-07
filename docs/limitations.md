@@ -34,10 +34,19 @@ stands today are listed — nothing here is a generic disclaimer.
      `py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6`, the hash GenLayer's own
      documentation cites verbatim on both its introduction and upgradability pages.
 
-  See the top of `contracts/workresolve.py` for the in-file explanation of both. This means a
-  **fourth deployment is required** — all three addresses above are, and will always be, dead (no
-  code was ever successfully committed to any of them). See `docs/release-notes.md` for the new
-  address once redeployed.
+  See the top of `contracts/workresolve.py` for the in-file explanation of both.
+
+  **A fourth deployment, with both fixes applied, succeeded and was verified genuinely live** —
+  address `0x14255277822815F43DA58271d8d28f0F844cf209`, tx
+  `0x85b326bb39ee766cb6f932ce9a098fbb37b158724f40184d268d4543b645f30a`. Verified two ways, not just
+  by the CLI's own "deployed successfully" message (which, as this whole entry demonstrates, does
+  not mean the deployment actually worked): `genlayer receipt` on the deployment tx shows
+  `txExecutionResultName: FINISHED_WITH_RETURN` (not `FINISHED_WITH_ERROR`, unlike all three prior
+  attempts), and `genlayer code 0x1425...` returns this contract's actual full source rather than
+  GenLayer's "contract code not found" error. All three prior addresses remain permanently dead. See
+  `docs/release-notes.md` and `docs/genlayer-integration.md` for the current address everywhere else
+  it's cited (README.md, docs/submission.md, the frontend's
+  `NEXT_PUBLIC_WORKRESOLVE_CONTRACT_ADDRESS`).
 - **`classifyBlockchainError` (`src/lib/genlayer/errors.ts`) now recognizes GenLayer's raw
   "Requested resource not found." RPC error (code `-32001`) instead of showing it verbatim** — this
   is what first surfaced the deployment bug above (it showed up as this raw error on the dashboard).
@@ -47,21 +56,21 @@ stands today are listed — nothing here is a generic disclaimer.
   above). Regression tests in `src/tests/unit/errors.test.ts`.
 - **This development sandbox still has no `genlayer.com` network egress and no reachable Docker
   daemon**, so deployment, `genlayer trace`/`genlayer receipt` calls, and any other live-network
-  command must run from a machine with real access, not from this sandbox. As of the redeployment
-  above (now known dead), no milestone lifecycle (fund → accept → submit → evaluate → settle) had
-  been run against a genuinely live contract, so `evaluate_and_finalize`'s real
-  `gl.exec_prompt`/`gl.get_webpage` calls and real validator consensus remain unexercised in
-  practice — every claim about contract correctness, evaluation behavior, and escrow accounting is
-  still verified only at the deterministic pure-Python logic level (94/94 tests in
-  `contracts/tests_logic`), not a full live run, until the next deployment succeeds.
+  command must run from a machine with real access, not from this sandbox. As of the fourth (now
+  live) deployment above, no milestone lifecycle (fund → accept → submit → evaluate → settle) has
+  yet been run against it, so `evaluate_and_finalize`'s real `gl.exec_prompt`/`gl.get_webpage` calls
+  and real validator consensus remain unexercised in practice — every claim about contract
+  correctness, evaluation behavior, and escrow accounting is still verified only at the deterministic
+  pure-Python logic level (94/94 tests in `contracts/tests_logic`), not a full live run, until a real
+  lifecycle is exercised against this deployment.
 - **The outbound transfer mechanism matches GenLayer's documented API on paper, but still needs a
-  live-network run to confirm end to end** — now blocked on the third deployment above rather than
-  by anything wrong with the mechanism itself. A GenLayer reviewer flagged the earlier
-  `gl.ContractAt(...).emit_transfer(...)` call as not a real API; it has been replaced with
-  `_pay_out()` / `_ExternalRecipient(...).emit_transfer(value=...)`, matching GenLayer's own "Value
-  Transfers" documentation. This is the single highest-priority item to verify once a working
-  deployment exists, via `contracts/tests/test_workresolve.py::TestCancelMilestone`'s two
-  deterministic (no-LLM) refund tests — see `docs/contracts.md` "Known Limitations."
+  live-network run to confirm end to end** — no longer blocked on deployment (see above), just not
+  yet exercised. A GenLayer reviewer flagged the earlier `gl.ContractAt(...).emit_transfer(...)` call
+  as not a real API; it has been replaced with `_pay_out()` /
+  `_ExternalRecipient(...).emit_transfer(value=...)`, matching GenLayer's own "Value Transfers"
+  documentation. This is the single highest-priority item to verify next against the live
+  deployment, via `contracts/tests/test_workresolve.py::TestCancelMilestone`'s two deterministic
+  (no-LLM) refund tests — see `docs/contracts.md` "Known Limitations."
 - **Wallet and browser edge cases (locked wallet, mid-session account/network switch, browser
   refresh during a pending transaction) were verified by code review, not live manual testing.** No
   browser automation was used in any phase of this project.

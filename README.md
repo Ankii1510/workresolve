@@ -126,15 +126,19 @@ Only what's actually implemented and tested:
 
 - **Network**: GenLayer Asimov Testnet (alias `testnet-asimov`, chain id `4221`) — see
   `src/lib/genlayer/config.ts`.
-- **Contract**: deployed. Address: `0x7BB7A6D936Fd72149424AE3681304dBc4E575B79`. Deployment
-  transaction: `0x60845f0b3a6d037fa327ff885ac6e666f3594475f7cf32614b99560233e4fe46`. Deployed via the
-  official `genlayer` CLI from a machine with real network access — see
+- **Contract**: deployed and verified genuinely live. Address:
+  `0x14255277822815F43DA58271d8d28f0F844cf209`. Deployment transaction:
+  `0x85b326bb39ee766cb6f932ce9a098fbb37b158724f40184d268d4543b645f30a`. Deployed via the official
+  `genlayer` CLI from a machine with real network access — see
   [`docs/genlayer-integration.md`](./docs/genlayer-integration.md) "GenLayer-specific proof." This is
-  a redeployment: a GenLayer reviewer's feedback on the original submission required contract-code
-  fixes (confirmed transfer mechanism, deadline gating, upgradability — see `docs/release-notes.md`
-  "Post-launch fixes"), which could not take effect on the original deployment
-  (`0x9F3B3360a4219A276ba76600e1CCD7B924eDC6C0`). Thanks to the upgradability now built into the
-  contract, this should be the last time a fix requires a new address.
+  the fourth deployment: three prior addresses
+  (`0x9F3B3360a4219A276ba76600e1CCD7B924eDC6C0`, `0x7BB7A6D936Fd72149424AE3681304dBc4E575B79`,
+  `0x8366417A85498fF3Ff8012E85Ab2DE7d6FE83b16`) each returned what looked like a normal success but
+  never actually finished deploying — two separate GenVM-level bugs in this file's own header
+  comment, root-caused with `genlayer receipt`/`genlayer trace` and fixed; see
+  `docs/limitations.md` for the full story. This one is confirmed live via `genlayer code`, which
+  returns the contract's actual source. Thanks to the upgradability now built into the contract
+  (and genuinely exercised this time), this should be the last time a fix requires a new address.
 - **Explorer**: https://explorer-asimov.genlayer.com/ (search the contract address or transaction
   hash above); `src/lib/genlayer/explorer.ts` derives the same URL from the selected chain's
   metadata.

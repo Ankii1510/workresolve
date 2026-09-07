@@ -97,19 +97,24 @@ https://github.com/Ankii1510/workresolve
 
 ## Contract
 
-**Deployed.** Network: GenLayer Asimov Testnet (`testnet-asimov`, chain id `4221`). Address:
-`0x7BB7A6D936Fd72149424AE3681304dBc4E575B79`. Deployment transaction:
-`0x60845f0b3a6d037fa327ff885ac6e666f3594475f7cf32614b99560233e4fe46`. Explorer:
-https://explorer-asimov.genlayer.com/. This is a redeployment addressing reviewer feedback on the
-initial submission: the native-currency transfer mechanism now matches GenLayer's own documented API
-(see `docs/contracts.md` "Escrow Architecture"); `submit_work` rejects any submission made after a
-milestone's deadline, preserving the client's cancellation right; and the contract now opts into
+**Deployed and verified genuinely live.** Network: GenLayer Asimov Testnet (`testnet-asimov`, chain
+id `4221`). Address: `0x14255277822815F43DA58271d8d28f0F844cf209`. Deployment transaction:
+`0x85b326bb39ee766cb6f932ce9a098fbb37b158724f40184d268d4543b645f30a`. Explorer:
+https://explorer-asimov.genlayer.com/. This is the fourth deployment addressing reviewer feedback on
+the initial submission: the native-currency transfer mechanism now matches GenLayer's own documented
+API (see `docs/contracts.md` "Escrow Architecture"); `submit_work` rejects any submission made after
+a milestone's deadline, preserving the client's cancellation right; and the contract now opts into
 GenLayer's own upgradability mechanism (see `docs/contracts.md` "Upgradability") so that no future
-fix needs another redeployment. The original deployment
-(`0x9F3B3360a4219A276ba76600e1CCD7B924eDC6C0`) predates these fixes and is superseded. See
-`docs/release-notes.md` "Post-launch fixes" and "Blockers to v1.0.0" for the full explanation and
-remaining status (a real, end-to-end two-wallet APPROVE/REJECT lifecycle, and a live-network run of
-the deterministic funded-lifecycle refund tests, both against this new deployment).
+fix needs another redeployment. Three prior addresses
+(`0x9F3B3360a4219A276ba76600e1CCD7B924eDC6C0`, `0x7BB7A6D936Fd72149424AE3681304dBc4E575B79`,
+`0x8366417A85498fF3Ff8012E85Ab2DE7d6FE83b16`) are superseded and permanently dead — each looked like
+a normal deploy success but never actually finished, due to two separate GenVM-level bugs in this
+file's own header comment (root-caused with `genlayer receipt`/`genlayer trace`, see
+`docs/limitations.md`). This deployment is confirmed live via `genlayer code`, which returns the
+contract's actual source rather than a "code not found" error. See `docs/release-notes.md`
+"Post-launch fixes" and "Blockers to v1.0.0" for the full explanation and remaining status (a real,
+end-to-end two-wallet APPROVE/REJECT lifecycle, and a live-network run of the deterministic
+funded-lifecycle refund tests, both against this new deployment).
 
 ## Testnet
 

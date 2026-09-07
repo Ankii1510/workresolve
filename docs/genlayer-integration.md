@@ -90,23 +90,39 @@ centralized or absent.
   deterministic core (see that file's own docstring for why the split exists).
 - **Contract address / network**: deployed to **GenLayer Asimov Testnet** (alias `testnet-asimov`,
   chain id `4221`, RPC `https://rpc-asimov.genlayer.com`).
-  - **Current contract address**: `0x7BB7A6D936Fd72149424AE3681304dBc4E575B79`
-  - Deployment transaction: `0x60845f0b3a6d037fa327ff885ac6e666f3594475f7cf32614b99560233e4fe46`
+  - **Current contract address**: `0x14255277822815F43DA58271d8d28f0F844cf209`
+  - Deployment transaction: `0x85b326bb39ee766cb6f932ce9a098fbb37b158724f40184d268d4543b645f30a`
   - Explorer: https://explorer-asimov.genlayer.com/ (search the address or transaction hash above)
   - Deployed via the official `genlayer` CLI (`genlayer deploy --contract workresolve.py`) from a
     machine with real network access — this development sandbox itself has no `genlayer.com`
     network egress (see `docs/limitations.md`), so deployment was performed outside it, not by
     disabling or working around that restriction.
-  - **This is a redeployment.** The original deployment (address
-    `0x9F3B3360a4219A276ba76600e1CCD7B924eDC6C0`, tx
-    `0xbcb13223a03a32a23adf217727adcc6884002d08c2e98c44fbebf2a19ced72dc`) predates a GenLayer
-    reviewer's feedback that required contract-code fixes (confirmed native-transfer mechanism,
-    deadline-gated submission, and upgradability — see `docs/release-notes.md` "Post-launch fixes"
-    and `docs/contracts.md` "Escrow Architecture" / "Upgradability"), none of which could take effect
-    on an already-deployed contract. This new address is the one currently live and the one the
-    frontend's `NEXT_PUBLIC_WORKRESOLVE_CONTRACT_ADDRESS` should point at. Thanks to the upgradability
-    mechanism now built into the contract, this should be the last time a fix requires a new
-    address — future fixes can go through the contract's own `upgrade()` method instead.
+  - **Verified as genuinely live**, not just a returned address/hash (see `docs/limitations.md` for
+    why that distinction matters here): `genlayer receipt <deployTxHash>` shows
+    `txExecutionResultName: FINISHED_WITH_RETURN`, and `genlayer code <address>` returns this
+    contract's actual full source — proof `__init__` completed and code is genuinely stored on-chain.
+  - **This is the fourth deployment.** Three prior addresses are permanently dead — none of them
+    ever finished a successful `__init__`, despite each returning what looked like a normal
+    address+hash from `genlayer deploy`:
+    - `0x9F3B3360a4219A276ba76600e1CCD7B924eDC6C0` (tx
+      `0xbcb13223a03a32a23adf217727adcc6884002d08c2e98c44fbebf2a19ced72dc`) — the original
+      deployment, predates a GenLayer reviewer's feedback that required contract-code fixes
+      (confirmed native-transfer mechanism, deadline-gated submission, and upgradability — see
+      `docs/release-notes.md` "Post-launch fixes" and `docs/contracts.md` "Escrow Architecture" /
+      "Upgradability").
+    - `0x7BB7A6D936Fd72149424AE3681304dBc4E575B79` (tx
+      `0x60845f0b3a6d037fa327ff885ac6e666f3594475f7cf32614b99560233e4fe46`) — carried those fixes,
+      but hit a GenVM comment-concatenation parse bug in this file's header.
+    - `0x8366417A85498fF3Ff8012E85Ab2DE7d6FE83b16` (tx
+      `0x892c9305bc998bc45e42311eda8c3f1117fc091a348c92a65c90109a23ef43e3`) — fixed the parse bug,
+      but then hit a second bug: `py-genlayer:test` is a debug-only runner id, invalid on the public
+      testnet.
+    Both bugs are explained in full, with the exact `genlayer trace` output that diagnosed each, at
+    the top of `contracts/workresolve.py` and in `docs/limitations.md`. This new address is the one
+    currently live and the one the frontend's `NEXT_PUBLIC_WORKRESOLVE_CONTRACT_ADDRESS` should point
+    at. Thanks to the upgradability mechanism built into the contract (and now genuinely exercised,
+    since this deployment's `__init__` actually ran), this should be the last time a fix requires a
+    new address — future fixes can go through the contract's own `upgrade()` method instead.
 - **Relevant contract methods**: `evaluate_and_finalize` (the one GenLayer-dependent method —
   `contracts/workresolve.py`, search for `gl.get_webpage`/`gl.exec_prompt`/
   `gl.eq_principle_prompt_comparative`); `compute_score`/`decide` (the deterministic consumers of

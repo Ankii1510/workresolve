@@ -99,16 +99,24 @@ for this release and belongs on the roadmap (see `README.md` "Roadmap"), not in 
   security tradeoff it deliberately accepts. Covered by a new `TestUpgradability` class in
   `contracts/tests/test_workresolve.py` (needs a live network to run, same as the rest of that file).
 
-- **Redeployed to carry all of the above onto the live network.** GenLayer contracts cannot be
-  modified after deployment unless upgradability was already in place *before* that deployment,
-  which the original `0x9F3B3360a4219A276ba76600e1CCD7B924eDC6C0` deployment was not — so the
-  corrected transfer mechanism, the deadline fix, and upgradability itself all required a fresh
-  deployment to take effect. Redeployed via the same `genlayer deploy --contract workresolve.py`
-  process as the original one:
-  - New contract address: `0x7BB7A6D936Fd72149424AE3681304dBc4E575B79`
-  - Deployment transaction: `0x60845f0b3a6d037fa327ff885ac6e666f3594475f7cf32614b99560233e4fe46`
+- **Redeployed to carry all of the above onto the live network — and this took four attempts to
+  actually land.** GenLayer contracts cannot be modified after deployment unless upgradability was
+  already in place *before* that deployment, which the original
+  `0x9F3B3360a4219A276ba76600e1CCD7B924eDC6C0` deployment was not — so the corrected transfer
+  mechanism, the deadline fix, and upgradability itself all required a fresh deployment to take
+  effect. The next two attempts (`0x7BB7A6D936Fd72149424AE3681304dBc4E575B79`, then
+  `0x8366417A85498fF3Ff8012E85Ab2DE7d6FE83b16`) each returned a normal-looking address and
+  transaction hash from `genlayer deploy`, but neither ever actually worked — both hit GenVM-level
+  bugs in this file's own header comment (a comment-concatenation JSON parse error, then an invalid
+  debug-only runner id), root-caused with `genlayer receipt`/`genlayer trace` rather than guessed;
+  see `docs/limitations.md` for the full two-bug story. The fourth attempt, with both bugs fixed,
+  succeeded and was verified genuinely live via `genlayer code` (returns the real source) and
+  `genlayer receipt` (`FINISHED_WITH_RETURN`, not `FINISHED_WITH_ERROR`):
+  - **Current, verified-live contract address**: `0x14255277822815F43DA58271d8d28f0F844cf209`
+  - Deployment transaction: `0x85b326bb39ee766cb6f932ce9a098fbb37b158724f40184d268d4543b645f30a`
   This address becomes the last one this project should ever need to change for a contract-logic
-  fix, thanks to the upgrade mechanism above. See "Blockers to v1.0.0" below for current status.
+  fix, thanks to the upgrade mechanism above (now genuinely exercised, since this deployment's
+  `__init__` actually ran). See "Blockers to v1.0.0" below for current status.
 
 ## What's explicitly NOT in v0.1.0-testnet
 
@@ -122,23 +130,30 @@ for this release and belongs on the roadmap (see `README.md` "Roadmap"), not in 
 
 ## Blockers to v1.0.0
 
-1. ~~A real contract deployment to a GenLayer network~~ — **done, and redeployed after reviewer
-   feedback.** The original deployment (address `0x9F3B3360a4219A276ba76600e1CCD7B924eDC6C0`, tx
-   `0xbcb13223a03a32a23adf217727adcc6884002d08c2e98c44fbebf2a19ced72dc`) is superseded. **Current
-   deployment**: address `0x7BB7A6D936Fd72149424AE3681304dBc4E575B79`, tx
-   `0x60845f0b3a6d037fa327ff885ac6e666f3594475f7cf32614b99560233e4fe46`, both to GenLayer Asimov
-   Testnet (`testnet-asimov`, chain id `4221`) via the official `genlayer` CLI, from a machine with
-   real network access (this development sandbox itself still has no `genlayer.com` egress — see
-   `docs/limitations.md`). This redeployment carries the reviewer-driven fixes (confirmed transfer
-   mechanism, deadline gating, upgradability — see "Post-launch fixes" above) onto the live network.
+1. ~~A real contract deployment to a GenLayer network~~ — **done, verified genuinely live, after
+   three dead attempts.** Addresses `0x9F3B3360a4219A276ba76600e1CCD7B924eDC6C0`,
+   `0x7BB7A6D936Fd72149424AE3681304dBc4E575B79`, and `0x8366417A85498fF3Ff8012E85Ab2DE7d6FE83b16` are
+   all permanently superseded and dead — each returned a normal-looking `genlayer deploy` result but
+   never actually finished deploying (see `docs/limitations.md` for the two GenVM-level bugs that
+   caused this, found via `genlayer receipt`/`genlayer trace` rather than guessed). **Current,
+   verified-live deployment**: address `0x14255277822815F43DA58271d8d28f0F844cf209`, tx
+   `0x85b326bb39ee766cb6f932ce9a098fbb37b158724f40184d268d4543b645f30a`, on GenLayer Asimov Testnet
+   (`testnet-asimov`, chain id `4221`) via the official `genlayer` CLI, from a machine with real
+   network access (this development sandbox itself still has no `genlayer.com` egress — see
+   `docs/limitations.md`). Verified genuinely live — not just a returned address/hash — via
+   `genlayer code` (returns the real deployed source) and `genlayer receipt`
+   (`txExecutionResultName: FINISHED_WITH_RETURN`). This deployment carries the reviewer-driven fixes
+   (confirmed transfer mechanism, deadline gating, upgradability — see "Post-launch fixes" above)
+   onto the live network.
 2. A real two-wallet APPROVE flow and REJECT flow, executed and recorded with actual transaction
    hashes, against the current deployment above. **Still pending.**
 3. ~~A deployed, publicly reachable production frontend pointed at that contract~~ — **done, needs
-   re-pointing to the new address.** Live at https://workresolve.vercel.app/, deployed on Vercel and
-   currently configured with `NEXT_PUBLIC_WORKRESOLVE_CONTRACT_ADDRESS` pointed at the *original*
-   deployed contract (verified: the Create Milestone form loads with no "not configured" error). This
-   env var needs updating to `0x7BB7A6D936Fd72149424AE3681304dBc4E575B79` on Vercel.
+   re-pointing to the new address.** Live at https://workresolve.vercel.app/, deployed on Vercel.
+   `NEXT_PUBLIC_WORKRESOLVE_CONTRACT_ADDRESS` needs updating to
+   `0x14255277822815F43DA58271d8d28f0F844cf209` on Vercel (and a redeploy triggered, since Next.js
+   inlines `NEXT_PUBLIC_*` vars at build time — saving the env var alone does not update an
+   already-built deployment).
 
 Items 1 and 3 were deployment/infrastructure actions, not code changes, and required an environment
 with real network access, which this development sandbox does not have — both were performed from
-the project owner's own machine, including this redeployment. Item 2 remains.
+the project owner's own machine. Item 2 remains.
