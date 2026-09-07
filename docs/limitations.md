@@ -47,6 +47,32 @@ stands today are listed — nothing here is a generic disclaimer.
   `docs/release-notes.md` and `docs/genlayer-integration.md` for the current address everywhere else
   it's cited (README.md, docs/submission.md, the frontend's
   `NEXT_PUBLIC_WORKRESOLVE_CONTRACT_ADDRESS`).
+- **RESOLVED — a third real bug, this time application-level, found the first time `create_milestone`
+  was actually called against the genuinely-live fourth deployment: `_hash_requirements` called
+  `gl.hash(...)`, a function that does not exist anywhere in GenLayer's real SDK.** It was an
+  unverified `[TBD-confirm]` guess from Phase 2 that passed every local test and every deployment
+  check (both only exercise the pure-Python mirror in `contracts/logic/workresolve_logic.py`, which
+  correctly uses `hashlib.sha256`; the gltest integration suite that would have caught this needs a
+  live network this sandbox has never had), then made every real `create_milestone` transaction fail
+  with `txExecutionResultName: FINISHED_WITH_ERROR`. Root-caused with `genlayer trace <txId>` on the
+  failing transaction, which showed the exact Python traceback: `AttributeError: module 'genlayer.gl'
+  has no attribute 'hash'`, raised from this line. GenLayer's real SDK does expose a hash primitive —
+  `genlayer.py.keccak.Keccak256` (confirmed via `https://sdk.genlayer.com/v0.1.0/_modules/genlayer/py/keccak.html`)
+  — but switching to it would have silently broken this contract's own documented parity requirement
+  with the frontend (`src/lib/genlayer/canonical.ts`) and the pure-Python mirror, both of which
+  compute `requirements_hash` with SHA-256 specifically so a client can independently recompute it.
+  **Fixed** by using Python's built-in `hashlib.sha256` directly — plain deterministic computation
+  with no I/O or randomness, compiled into CPython itself (no OpenSSL/OS dependency), so it behaves
+  identically inside GenVM's sandboxed Python as anywhere else — making `_hash_requirements` on-chain
+  byte-for-byte identical to `hash_requirements()` in `contracts/logic/workresolve_logic.py` again.
+  **Fixed via the contract's own `upgrade()` method, not a fifth redeployment** — this is exactly the
+  scenario the upgradability mechanism (added earlier this phase, see "Post-launch fixes" in
+  `docs/release-notes.md`) exists for. `genlayer write`'s CLI, however, has no way to actually carry a
+  whole file's bytes as an argument (its only `bytes` syntax is an inline `b#<hex>` string, and
+  hex-encoding this ~46 KB file produces ~92,000 characters — well past Windows' command-line length
+  limit), so `scripts/upgrade-contract.mjs` was added: a small Node script that calls genlayer-js's
+  own `writeContract` directly with the file's raw bytes (no CLI length limit at all), reusing the
+  same account genlayer-cli used to deploy. See that script's own header comment for exact usage.
 - **`classifyBlockchainError` (`src/lib/genlayer/errors.ts`) now recognizes GenLayer's raw
   "Requested resource not found." RPC error (code `-32001`) instead of showing it verbatim** — this
   is what first surfaced the deployment bug above (it showed up as this raw error on the dashboard).

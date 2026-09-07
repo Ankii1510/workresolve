@@ -94,6 +94,7 @@
 # already-deployed, already-cited address via `upgrade()` — see `upgrade()`'s
 # own docstring for the security tradeoff this deliberately accepts.
 
+import hashlib
 import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -314,18 +315,34 @@ class WorkResolve(gl.Contract):
 
     def _hash_requirements(self, requirements: list) -> str:
         # Mirrors hash_requirements() in contracts/logic/workresolve_logic.py.
+        #
+        # BUG FOUND ON THE LIVE NETWORK, POST-DEPLOYMENT — DO NOT REINTRODUCE.
+        # This used to call `gl.hash(...)`, a function that does not exist
+        # anywhere in GenLayer's real SDK (it was an unverified [TBD-confirm]
+        # guess from Phase 2 that was never exercised against a live GenVM,
+        # because `contracts/tests_logic` only tests the pure-Python mirror
+        # in `workresolve_logic.py`, and the gltest integration file
+        # (`contracts/tests/test_workresolve.py`) needs a live network this
+        # sandbox has never had). It passed every local test and every
+        # deployment check, then made every `create_milestone` call fail on
+        # the real testnet: `genlayer trace <txId>` on the failing tx showed
+        # `AttributeError: module 'genlayer.gl' has no attribute 'hash'`,
+        # raised from this exact line. GenLayer's real SDK exposes hashing
+        # as `genlayer.py.keccak.Keccak256`, not `gl.hash` — but switching to
+        # that would silently break parity with the frontend
+        # (`src/lib/genlayer/canonical.ts`) and the pure-Python mirror here,
+        # both of which use SHA-256 specifically so a client can
+        # independently recompute `milestone.requirements_hash` byte-for-byte
+        # (see `docs/contracts.md` "Known Limitations"). SHA-256 is plain
+        # deterministic computation with no I/O or randomness, and CPython's
+        # `hashlib.sha256` is a built-in compiled directly into the
+        # interpreter (no OpenSSL/OS dependency), so it works the same way
+        # inside GenVM's sandboxed Python as it does anywhere else. Using it
+        # here keeps this function byte-for-byte identical to
+        # `hash_requirements()` in `contracts/logic/workresolve_logic.py`,
+        # which is what the pure-Python test suite actually exercises.
         canonical = self._canonicalize_requirements(requirements)
-        digest = gl.hash(canonical.encode("utf-8"))
-        # gl.hash's exact return type/encoding is one of the few remaining
-        # [TBD-confirm] items from Phase 2 that this phase could not settle
-        # from bundled examples (none of them hash arbitrary bytes on-chain).
-        # Normalized to a 0x-prefixed hex string here so the stored
-        # requirements_hash format matches the frontend's SHA-256 hex output
-        # in shape even if the underlying primitive differs — see
-        # docs/contracts.md "Known Limitations".
-        if isinstance(digest, (bytes, bytearray)):
-            return "0x" + digest.hex()
-        return str(digest)
+        return "0x" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
     def _requirement_points(self, status: str, weight: int) -> int:
         # Mirrors requirement_points() in contracts/logic/workresolve_logic.py.
