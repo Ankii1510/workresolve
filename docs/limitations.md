@@ -28,6 +28,16 @@ stands today are listed — nothing here is a generic disclaimer.
   highest-priority item to verify next against the live deployment, via
   `contracts/tests/test_workresolve.py::TestCancelMilestone`'s two deterministic (no-LLM) refund
   tests — see `docs/contracts.md` "Known Limitations."
+- **Reads against a just-(re)deployed contract can briefly fail with a GenLayer-side "resource not
+  found" RPC error, not an app bug.** After the redeployment above, the dashboard's
+  `get_milestones_by_client`/`_by_freelancer` reads failed with GenLayer's own raw RPC error (EIP-1474
+  code `-32001`, "Requested resource not found.") for a period afterward — most likely because the RPC
+  node serving the read hadn't yet caught up on the freshly deployed contract's state. This raw message
+  was previously shown to the user verbatim; `classifyBlockchainError`
+  (`src/lib/genlayer/errors.ts`) now recognizes it and shows a clear, accurate explanation instead
+  ("expected for a few minutes after a deployment/redeployment — try again shortly"), with regression
+  tests in `src/tests/unit/errors.test.ts`. This is a real, observed GenLayer testnet behavior right
+  after a (re)deployment, not something this app can prevent — only explain honestly while it clears.
 - **Wallet and browser edge cases (locked wallet, mid-session account/network switch, browser
   refresh during a pending transaction) were verified by code review, not live manual testing.** No
   browser automation was used in any phase of this project.
