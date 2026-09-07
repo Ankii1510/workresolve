@@ -126,8 +126,14 @@ for this release and belongs on the roadmap (see `README.md` "Roadmap"), not in 
   `hashlib.sha256` (matching the frontend and the pure-Python mirror exactly, unlike GenLayer's real
   `Keccak256` primitive, which would have broken that parity). Unlike the two deployment-level bugs
   above, this one did **not** need a fifth redeployment — it's exactly what the upgrade mechanism was
-  built for: see `scripts/upgrade-contract.mjs` (a Node script, since `genlayer write`'s CLI has no
-  way to pass a whole file's bytes as an argument) and `docs/limitations.md` for the full story.
+  built for: `scripts/upgrade-contract.mjs` (a Node script, since `genlayer write`'s CLI has no way to
+  pass a whole file's bytes as an argument — see the script's own header comment for why) sent the fix
+  via `upgrade()`. **Confirmed live**: upgrade transaction
+  `0x6e0879d642d9e7ccecdb85bd7bd6be8889e38459f2a848338c765543db799fa7`, `genlayer receipt` shows
+  `txExecutionResultName: FINISHED_WITH_RETURN`, and `genlayer code` on
+  `0x14255277822815F43DA58271d8d28f0F844cf209` now returns the corrected source (`import hashlib` /
+  `hashlib.sha256(...)` in `_hash_requirements`) — same address as before, no redeployment, exactly
+  the payoff the upgrade mechanism was built for. See `docs/limitations.md` for the full story.
 
 ## What's explicitly NOT in v0.1.0-testnet
 
@@ -155,14 +161,12 @@ for this release and belongs on the roadmap (see `README.md` "Roadmap"), not in 
    `genlayer code` (returns the real deployed source) and `genlayer receipt`
    (`txExecutionResultName: FINISHED_WITH_RETURN`). This deployment carries the reviewer-driven fixes
    (confirmed transfer mechanism, deadline gating, upgradability — see "Post-launch fixes" above)
-   onto the live network. **A third bug (the `gl.hash` issue above) was found and fixed in the repo
-  after this deployment, but as of this writing the fix has not yet been pushed on-chain via
-  `scripts/upgrade-contract.mjs` — the live contract still has the old, broken `_hash_requirements`
-  until that upgrade transaction is sent and verified.**
+   onto the live network. **A third bug (the `gl.hash` issue below) was found after this deployment
+  and has since been fixed in place via `upgrade()` — see the entry right after this one.**
 2. A real two-wallet APPROVE flow and REJECT flow, executed and recorded with actual transaction
-   hashes, against the current deployment above. **Still pending** (blocked on item 1's upgrade
-   transaction actually landing first, since `create_milestone` — the very first step of that flow —
-   is what's currently broken on-chain).
+   hashes, against the current deployment above. **Still pending** — the contract itself is no longer
+   known-broken (the `gl.hash` bug that blocked `create_milestone` is fixed and confirmed live as of
+   the upgrade transaction below), so this is now unblocked and ready to actually attempt.
 3. ~~A deployed, publicly reachable production frontend pointed at that contract~~ — **done, needs
    re-pointing to the new address.** Live at https://workresolve.vercel.app/, deployed on Vercel.
    `NEXT_PUBLIC_WORKRESOLVE_CONTRACT_ADDRESS` needs updating to

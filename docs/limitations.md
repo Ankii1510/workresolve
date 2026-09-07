@@ -73,6 +73,11 @@ stands today are listed — nothing here is a generic disclaimer.
   limit), so `scripts/upgrade-contract.mjs` was added: a small Node script that calls genlayer-js's
   own `writeContract` directly with the file's raw bytes (no CLI length limit at all), reusing the
   same account genlayer-cli used to deploy. See that script's own header comment for exact usage.
+  **Verified genuinely live**, the same two-way way as every fix in this project: upgrade transaction
+  `0x6e0879d642d9e7ccecdb85bd7bd6be8889e38459f2a848338c765543db799fa7` — `genlayer receipt` shows
+  `txExecutionResultName: FINISHED_WITH_RETURN`, and `genlayer code 0x1425...` now returns the
+  corrected source (`import hashlib`, `hashlib.sha256(...)` in `_hash_requirements`, `gl.hash` gone)
+  at the same address as before — no new deployment, no new address to update anywhere.
 - **`classifyBlockchainError` (`src/lib/genlayer/errors.ts`) now recognizes GenLayer's raw
   "Requested resource not found." RPC error (code `-32001`) instead of showing it verbatim** — this
   is what first surfaced the deployment bug above (it showed up as this raw error on the dashboard).
