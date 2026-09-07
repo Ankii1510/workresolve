@@ -25,6 +25,14 @@ describe("TransactionStatusBanner", () => {
     expect(screen.queryByText("Transaction failed.")).not.toBeInTheDocument();
     expect(screen.getByText(/still confirming/i)).toBeInTheDocument();
     expect(screen.getByText(/may still be processing on genlayer/i)).toBeInTheDocument();
+
+    // Reviewer-driven follow-up: an uncertain (timed-out) result must not
+    // leave the user thinking they have to manually re-check or redo
+    // anything — the dashboard always re-reads on-chain state, so a
+    // transaction that does eventually succeed will show up there on its
+    // own with no further action.
+    const dashboardLink = screen.getByRole("link", { name: "Dashboard" });
+    expect(dashboardLink).toHaveAttribute("href", "/dashboard");
   });
 
   it("still says 'Transaction failed' for a real, non-timeout error", () => {

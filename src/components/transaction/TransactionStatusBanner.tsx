@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Spinner } from "@/components/ui/Spinner";
 import { getExplorer, getNetworkName } from "@/lib/genlayer/explorer";
 import type { AppError, TransactionStatus } from "@/types";
@@ -19,7 +20,13 @@ const STATUS_COPY: Record<TransactionStatus, string> = {
  * transaction failed when it may well still finalize — that's exactly the
  * kind of false alarm that risks a panicked, uncertain re-submission this
  * project's own transaction-safety rules (docs/security.md, "never
- * auto-resend uncertain transactions") exist to prevent. */
+ * auto-resend uncertain transactions") exist to prevent.
+ *
+ * A real, on-chain FAILED result (a genuine ContractRevertError — the
+ * contract actually finished executing and rejected the call) is different
+ * and is NOT covered by this: that means nothing was created/changed, and
+ * the "Transaction failed." heading + red styling is correct for it. This
+ * flag exists to separate the two cases, not to soften every failure. */
 function isUnresolvedTimeout(status: TransactionStatus, error: AppError | null): boolean {
   return status === "FAILED" && error?.code === "TRANSACTION_TIMEOUT";
 }
@@ -102,7 +109,13 @@ export function TransactionStatusBanner({
         {unresolvedTimeout && hash && (
           <p className="mt-1 text-xs opacity-75">
             This app stopped checking, but the transaction itself may still be processing on GenLayer
-            — check its status on the explorer above before assuming it needs to be redone.
+            — check its status on the explorer above before assuming it needs to be redone. If it
+            does succeed, it will appear automatically on your{" "}
+            <Link href="/dashboard" className="font-medium underline underline-offset-2">
+              Dashboard
+            </Link>{" "}
+            next time you open or refresh it — the dashboard always reads the current on-chain state,
+            not a cached copy, so nothing further needs to be done here to make it show up.
           </p>
         )}
       </div>
