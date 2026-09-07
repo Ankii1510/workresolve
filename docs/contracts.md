@@ -248,15 +248,22 @@ three places, each behind a state guard and an idempotency latch: `release_payme
 freelancer, latched by `milestone.paid`), `refund_client` (`REJECTED` → client, latched by
 `milestone.refunded`), and `cancel_milestone`'s refund path (`FUNDED` or `ACCEPTED` → client, also
 latched by `milestone.refunded`). All three follow checks-effects-interactions ordering: every
-storage mutation (`state`, `paid`/`refunded`, reputation counters) happens *before* the
-`gl.ContractAt(recipient).emit_transfer(amount)` call, so even a hypothetical reentrant call during
-the transfer would see a milestone whose guards already reflect the settlement, not one still open
-for a second payout. No balance is ever fabricated: `milestone.amount` is only ever set from the
-value actually received in `fund_milestone`, and the same `u256` value is what's later transferred
-out — there is no separate "credited balance" ledger that could drift from real value received.
+storage mutation (`state`, `paid`/`refunded`, reputation counters) happens *before* the outbound
+`_pay_out(recipient, amount)` call, so even a hypothetical reentrant call during the transfer would
+see a milestone whose guards already reflect the settlement, not one still open for a second payout.
+No balance is ever fabricated: `milestone.amount` is only ever set from the value actually received
+in `fund_milestone`, and the same `u256` value is what's later transferred out — there is no separate
+"credited balance" ledger that could drift from real value received.
 
-**Known limitation, honestly disclosed**: `gl.ContractAt(...).emit_transfer(...)` is this contract's
-single least-confirmed API call — see "Known Limitations" below.
+**Confirmed GenVM-native transfer mechanism.** `_pay_out()` (top of `contracts/workresolve.py`) wraps
+`_ExternalRecipient(recipient).emit_transfer(value=amount)`, where `_ExternalRecipient` is an
+`@gl.evm.contract_interface`-decorated class with empty `View`/`Write` bodies — this is GenLayer's own
+documented pattern for sending native GEN to a plain wallet (EOA) address, confirmed directly from
+its "Value Transfers" docs page (the "Faucet" example) and "Interacting with EVM Contracts" page:
+https://docs.genlayer.com/developers/intelligent-contracts/features/value-transfers. This replaces an
+earlier, invented `gl.ContractAt(recipient).emit_transfer(amount)` call — flagged by a GenLayer
+reviewer as not a real API — which was built from an unconfirmed guess rather than documented
+behavior. `gl.ContractAt` does not exist anywhere in GenLayer's real API.
 
 ## Deadline & Timeout Handling
 
@@ -278,6 +285,19 @@ Deliberately simple, per the Phase 2/4 "no complex arbitration" instruction:
   separate "evaluation timeout" state: `evaluate_and_finalize` is permissionless (anyone can call it,
   not just the two parties), so there is no scenario where evaluation is stuck waiting on a specific
   caller.
+- **Reviewer-flagged fix: submission is itself deadline-gated.** Before this fix, `submit_work` had
+  no deadline check at all — a freelancer could submit (or re-submit) work after `milestone.deadline`
+  had already passed, and because submitting moves the milestone out of `ACCEPTED` into `SUBMITTED` (a
+  state `cancel_milestone` does not accept), a single late submission could permanently strand the
+  client with no way to cancel and get a refund, even though the deadline they were protected by had
+  already passed. `submit_work` now raises if `_now_unix() >= int(milestone.deadline)`, the exact
+  complement of `cancel_milestone`'s own `_now_unix() >= int(milestone.deadline)` check — at the
+  boundary instant, submission is blocked and cancellation is already allowed, so there is never a gap
+  where neither applies (`can_submit_work` / `can_cancel_from_accepted` in
+  `contracts/logic/workresolve_logic.py`, and
+  `TestDeadlineSubmission::test_submission_and_cancellation_boundaries_never_overlap_or_gap` for the
+  executed proof). Net effect: a client can now always recover a `FUNDED`/`ACCEPTED` milestone whose
+  freelancer never delivered on time, without depending on the freelancer's cooperation.
 - A correctness bug was caught and fixed during this phase's own review, before any test run: an
   earlier draft of `cancel_milestone` only refunded the client when cancelling from `FUNDED`, which
   would have silently stranded a client's escrowed funds if they cancelled from `ACCEPTED` after the
@@ -425,14 +445,14 @@ Reviewed explicitly against every item the Phase 4 spec requested:
   handling (outside this contract's scope, per Phase 2's on-chain/off-chain split) is the base layer
   replay defense for the transaction envelope itself.
 - **Reentrancy.** All three value-transferring methods follow checks-effects-interactions: state,
-  `paid`/`refunded` latches, and reputation counters are all written before the single
-  `gl.ContractAt(...).emit_transfer(...)` call at the end of each method — a reentrant call during
-  that transfer would find the guards already tripped.
+  `paid`/`refunded` latches, and reputation counters are all written before the single `_pay_out()`
+  call at the end of each method — a reentrant call during that transfer would find the guards
+  already tripped.
 - **External calls.** The only external calls this contract makes are `gl.get_webpage` (read-only,
   inside the non-deterministic closure, output only ever reaches the LLM prompt — never interpreted
-  as code or as a contract call) and `gl.ContractAt(...).emit_transfer(...)` (value transfer to a
-  stored `Address`, never to a caller-supplied address at call time — always `milestone.client` or
-  `milestone.freelancer`, both fixed at `create_milestone`).
+  as code or as a contract call) and `_pay_out()` / `_ExternalRecipient(...).emit_transfer(...)`
+  (value transfer to a stored `Address`, never to a caller-supplied address at call time — always
+  `milestone.client` or `milestone.freelancer`, both fixed at `create_milestone`).
 - **Integer handling.** All persistent numeric fields use `u256` (unbounded-`int` storage is
   disallowed per GenVM's storage typing rules); `requirement_weights` are validated to each be
   `1..100` and sum to exactly `100` at creation, so `_requirement_points`/`compute_score` can never
@@ -460,14 +480,18 @@ Stated plainly, per the explicit Phase 4 instruction never to hide or paper over
    `contracts/logic/workresolve_logic.py` — the deliberately GenVM-free deterministic core — has
    real, executed test output (`contracts/tests_logic/`, 65/65 passing, see the Phase 4 completion
    report).
-2. **`gl.ContractAt(...).emit_transfer(...)` is unconfirmed against a live run.** This is the
-   mechanism `release_payment`, `refund_client`, and `cancel_milestone`'s refund path all use to
-   actually move funds out of the contract. No bundled example this phase could inspect moves value
-   out of a contract (only into one, via `@gl.public.write.payable`). The call is built from a
-   confirmed `gl.ContractAt(...)` pattern (used for reads elsewhere) plus a `Proxy.emit_transfer`
-   signature from GenLayer's hosted API reference, but this specific composition has not been
-   exercised. **This is the single highest-priority item to verify against a live GenLayer Studio
-   session before this contract is trusted with any real funds.**
+2. **Resolved: the outbound transfer mechanism now matches GenLayer's documented API, but still
+   needs a live-network run to confirm end to end.** An earlier version of this contract used an
+   invented `gl.ContractAt(recipient).emit_transfer(amount)` call — a GenLayer reviewer correctly
+   flagged this as not a real API. It has been replaced with `_pay_out()` /
+   `_ExternalRecipient(recipient).emit_transfer(value=amount)`, matching the "Faucet" example on
+   GenLayer's own "Value Transfers" docs page verbatim (see "Escrow Architecture" above for the exact
+   citation). This is now believed correct on documentation grounds, but — like every other write
+   path in this contract — has not yet been exercised against a live GenVM network from this
+   environment (see item 1 above); `contracts/tests/test_workresolve.py`'s
+   `TestCancelMilestone::test_cancelling_a_funded_milestone_refunds_the_client` and
+   `test_can_cancel_and_get_refunded_after_deadline_with_no_submission` are the two tests to run for
+   a deterministic (no-LLM, always-executing) confirmation that it actually moves funds on-chain.
 3. **Timestamp source verification is incomplete.** `_now_unix()` calls `datetime.now()` directly in
    deterministic contract code, following the confirmed pattern in GenLayer's bundled
    `intelligent_oracle.py` example (see `docs/architecture.md` "Phase 4 API corrections" item 5).

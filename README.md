@@ -187,7 +187,7 @@ npm run test            # frontend unit tests (Vitest)
 cd contracts && python3 -m pytest tests_logic -v   # contract logic tests (pytest)
 ```
 
-Current results: 152/152 frontend unit tests passing, 90/90 contract logic tests passing (including
+Current results: 152/152 frontend unit tests passing, 94/94 contract logic tests passing (including
 a dedicated prompt-injection defense suite and full URL-scheme/malformed-evaluation coverage — see
 `docs/security.md`).
 

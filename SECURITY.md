@@ -7,7 +7,7 @@ frontend, GenLayer evaluation, with severity ratings), see [`docs/security.md`](
 ## Audit status
 
 **This contract has not been formally audited by a third-party security firm.** Every claim of
-"tested" or "verified" in this repository refers to this project's own test suite (90/90 contract
+"tested" or "verified" in this repository refers to this project's own test suite (94/94 contract
 logic tests, 152/152 frontend unit tests — see `docs/security.md` and `docs/release-checklist.md`)
 and manual code review, not an independent professional audit. Do not treat this software as
 audited in the industry sense of that word.
@@ -58,10 +58,11 @@ arbitration of any kind.
 
 ## Known limitations
 
-See `docs/limitations.md` for the full, current, honest list. The two most relevant to security:
-nothing in this codebase has been executed against live GenVM consensus, and
-`gl.ContractAt(...).emit_transfer(...)` — the mechanism that actually moves funds out of the
-contract — has never been exercised against a live network.
+See `docs/limitations.md` for the full, current, honest list. The most relevant to security: the
+outbound transfer mechanism (`_pay_out()` / `_ExternalRecipient(...).emit_transfer(value=...)`, see
+`docs/contracts.md` "Escrow Architecture") now matches GenLayer's own documented API — an earlier,
+invented `gl.ContractAt(...).emit_transfer(...)` call was flagged by a GenLayer reviewer and replaced
+— but like the rest of this codebase it has not yet been exercised against live GenVM consensus.
 
 ## Reporting a vulnerability
 

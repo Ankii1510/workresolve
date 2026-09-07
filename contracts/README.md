@@ -80,11 +80,13 @@ real.
 - No direct network egress from shell commands to `docs.genlayer.com`/`studio.genlayer.com`
   (organization/agent-proxy policy). `WebFetch`/`WebSearch` tool calls use a different network path
   and did work for targeted documentation lookups during research.
-- Consequence: `contracts/workresolve.py` has never been deployed anywhere from this environment,
-  and `contracts/tests/test_workresolve.py` has never been executed. See `docs/contracts.md` "Known
-  Limitations" for the full, itemized list of what remains unverified as a result (most notably:
-  `gl.ContractAt(...).emit_transfer(...)` for moving funds out of the contract, and the exact
-  cross-validator reconciliation of `datetime.now()`-based timestamps).
+- Consequence: `contracts/tests/test_workresolve.py` has never been executed from this environment
+  (the contract itself has since been deployed to GenLayer's Asimov Testnet from a machine with real
+  network access — see `docs/genlayer-integration.md`). See `docs/contracts.md` "Known Limitations"
+  for the full, itemized list of what remains unverified as a result (most notably: the outbound
+  transfer mechanism, `_pay_out()` / `_ExternalRecipient(...).emit_transfer(value=...)` — matching
+  GenLayer's documented API after a reviewer flagged the earlier invented `gl.ContractAt(...)` call —
+  and the exact cross-validator reconciliation of `datetime.now()`-based timestamps).
 
 ## API sources
 

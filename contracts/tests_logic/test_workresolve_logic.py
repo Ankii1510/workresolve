@@ -23,6 +23,7 @@ from logic.workresolve_logic import (
     MILESTONE_STATES,
     ValidationResult,
     can_cancel_from_accepted,
+    can_submit_work,
     can_transition,
     canonicalize_requirements,
     compute_score,
@@ -555,6 +556,33 @@ class TestDeadlineCancellation:
     def test_no_refund_applies_when_cancelling_from_created(self):
         # No funds were ever escrowed at CREATED — nothing to return.
         assert refund_applies_on_cancel("CREATED") is False
+
+
+class TestDeadlineSubmission:
+    """Reviewer-flagged fix: submit_work() must reject a submission made
+    after the deadline has passed, both so a late submission can't itself
+    be evaluated as if it were on time, and so it can never block the
+    client's cancel_milestone() recourse (see can_submit_work()'s
+    docstring for how the two checks are kept in sync at the boundary)."""
+
+    def test_can_submit_before_deadline(self):
+        assert can_submit_work(now_unix=1000, deadline_unix=2000) is True
+
+    def test_cannot_submit_after_deadline(self):
+        assert can_submit_work(now_unix=2001, deadline_unix=2000) is False
+
+    def test_cannot_submit_exactly_at_deadline(self):
+        # Exclusive boundary — the complement of
+        # test_can_cancel_accepted_exactly_at_deadline above: at the exact
+        # deadline instant, submission is blocked and cancellation is
+        # already allowed, never both or neither.
+        assert can_submit_work(now_unix=2000, deadline_unix=2000) is False
+
+    def test_submission_and_cancellation_boundaries_never_overlap_or_gap(self):
+        for now_unix in range(1995, 2006):
+            submit_ok = can_submit_work(now_unix=now_unix, deadline_unix=2000)
+            cancel_ok = can_cancel_from_accepted(now_unix=now_unix, deadline_unix=2000)
+            assert submit_ok != cancel_ok
 
 
 # ---------------------------------------------------------------------------

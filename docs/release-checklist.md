@@ -77,7 +77,7 @@ aspiration — an unchecked box states exactly why.
 
 - [x] Lint — clean, zero warnings suppressed (`npm run lint`).
 - [x] Typecheck — clean (`npm run typecheck`).
-- [x] Tests — 152/152 frontend unit tests, 90/90 contract logic tests.
+- [x] Tests — 152/152 frontend unit tests, 94/94 contract logic tests.
 - [x] Production build — `npm run build` succeeds; additionally verified by actually running
       `npm start` and curling every route in production mode this phase (not just a dev-mode
       check), confirming the new security headers apply and no page 500s.

@@ -29,17 +29,22 @@
 # nested under `gl.nondet.*` / `gl.eq_principle.*` as Phase 1's docs reading
 # assumed).
 #
-# THE ONE GENUINELY UNCONFIRMED PIECE: sending native currency out of the
-# contract (`release_payment` / `refund_client` / `cancel_milestone`'s
-# refund path). No bundled example moves value out of a contract, so
-# `gl.ContractAt(recipient).emit_transfer(amount)` below is built from two
-# independently-corroborating but still-unexecuted sources (a real,
-# confirmed `gl.ContractAt(...)` call pattern from multi_tenant_storage.py,
-# plus a `Proxy.emit_transfer(value: u256, ...)` signature from GenLayer's
-# hosted API reference) rather than a working example. This is flagged again
-# at each call site below and is the #1 item to verify against a live
-# GenLayer Studio session before this contract is trusted with real funds —
-# see docs/contracts.md "Known Limitations".
+# NATIVE VALUE TRANSFERS OUT OF THE CONTRACT (`release_payment` /
+# `refund_client` / `cancel_milestone`'s refund path): a GenLayer reviewer
+# flagged the earlier `gl.ContractAt(recipient).emit_transfer(amount)` guess
+# here as an unconfirmed, invented API. It has been replaced with the
+# actually-documented mechanism, confirmed directly from GenLayer's own
+# "Value Transfers" page
+# (https://docs.genlayer.com/developers/intelligent-contracts/features/value-transfers)
+# and its "Interacting with EVM Contracts" page: sending value to an EOA (a
+# regular wallet address, which is what `milestone.client`/`milestone.freelancer`
+# always are here) goes through a locally-declared `@gl.evm.contract_interface`
+# class — see `_ExternalRecipient` below — instantiated with the target
+# `Address` and called as `_ExternalRecipient(addr).emit_transfer(value=amount)`,
+# matching that page's own "Faucet" example verbatim (down to the empty
+# `View`/`Write` nested classes and the keyword-only `value=` argument).
+# `gl.ContractAt` never appears anywhere in GenLayer's real API — it does not
+# exist, and no code in this file uses it anymore.
 
 import json
 from dataclasses import dataclass
@@ -65,6 +70,36 @@ from genlayer import *
 # confirmation.
 def _now_unix() -> int:
     return int(datetime.now(timezone.utc).timestamp())
+
+
+# ---------------------------------------------------------------------------
+# Confirmed GenVM-native transfer mechanism
+# ---------------------------------------------------------------------------
+#
+# Declared exactly as shown in GenLayer's own "Value Transfers" docs Faucet
+# example: an `@gl.evm.contract_interface`-decorated class with empty
+# `View`/`Write` bodies, instantiated with the recipient's `Address`, then
+# called as `.emit_transfer(value=...)`. `milestone.client` and
+# `milestone.freelancer` are always plain wallet (EOA) addresses in this
+# contract, never other GenLayer Intelligent Contracts, so this is the only
+# transfer path this contract needs (the separate `other.emit_transfer(...)`
+# form documented for IC-to-IC transfers does not apply here).
+@gl.evm.contract_interface
+class _ExternalRecipient:
+    class View:
+        pass
+
+    class Write:
+        pass
+
+
+def _pay_out(recipient: Address, amount: u256) -> None:
+    """Sends `amount` of the contract's native GEN balance to `recipient`.
+    Single choke point for every outbound transfer in this contract
+    (release, refund, and cancellation-refund) so there is exactly one place
+    that has to be right."""
+    _ExternalRecipient(recipient).emit_transfer(value=amount)
+
 
 # ---------------------------------------------------------------------------
 # Constants (mirror contracts/logic/workresolve_logic.py)
@@ -449,6 +484,22 @@ class WorkResolve(gl.Contract):
         self._require_state(milestone, "ACCEPTED", "SUBMITTED")
         if gl.message.sender_address != milestone.freelancer:
             raise ValueError("Only the assigned freelancer can submit work for this milestone.")
+        # Reviewer-flagged gap: nothing previously stopped a freelancer from
+        # submitting (or re-submitting) after `milestone.deadline` had
+        # already passed, which both let a late submission block
+        # cancel_milestone() (its ACCEPTED-state cancellation was the
+        # client's only recourse once the deadline passed) and let a
+        # freelancer submit work well outside the agreed window. Mirrors
+        # can_cancel_from_accepted() in contracts/logic/workresolve_logic.py
+        # (same now-vs-deadline comparison, opposite direction) and uses the
+        # same `_now_unix()` timestamp source as cancel_milestone() below, so
+        # the two checks can never disagree about whether the deadline has
+        # passed for a given milestone.
+        if _now_unix() >= int(milestone.deadline):
+            raise ValueError(
+                "Cannot submit work after the milestone deadline has passed. "
+                "Ask the client to cancel the milestone for a refund."
+            )
         if not deployed_url and not repository_url:
             raise ValueError("Provide at least a deployed URL or a repository URL.")
         if len(evidence_urls) > MAX_EVIDENCE_ITEMS:
@@ -641,9 +692,8 @@ Freelancer's notes: {freelancer_notes if freelancer_notes else "(none provided)"
         """Only a finalized APPROVE result can release escrow. Permissionless
         (see evaluate_and_finalize's docstring for why) and idempotency-
         latched via `paid` — see docs/contracts.md "Double Settlement
-        Protection". The actual value transfer
-        (`gl.ContractAt(...).emit_transfer(...)`) is this contract's single
-        least-confirmed line — see the module docstring at the top of this
+        Protection". The actual value transfer goes through `_pay_out()`,
+        the confirmed GenVM-native mechanism documented at the top of this
         file."""
         milestone = self._get_milestone(milestone_id)
         self._require_state(milestone, "APPROVED")
@@ -658,7 +708,7 @@ Freelancer's notes: {freelancer_notes if freelancer_notes else "(none provided)"
         self._record_reputation(milestone.client, "jobs_funded")
         self._record_reputation(milestone.client, "reputation_score", 2)
 
-        gl.ContractAt(milestone.freelancer).emit_transfer(milestone.amount)
+        _pay_out(milestone.freelancer, milestone.amount)
 
     @gl.public.write
     def refund_client(self, milestone_id: str) -> None:
@@ -675,7 +725,7 @@ Freelancer's notes: {freelancer_notes if freelancer_notes else "(none provided)"
         self._record_reputation(milestone.client, "jobs_funded")
         self._record_reputation(milestone.client, "reputation_score", 1)
 
-        gl.ContractAt(milestone.client).emit_transfer(milestone.amount)
+        _pay_out(milestone.client, milestone.amount)
 
     @gl.public.write
     def cancel_milestone(self, milestone_id: str) -> None:
@@ -714,7 +764,7 @@ Freelancer's notes: {freelancer_notes if freelancer_notes else "(none provided)"
 
         if had_funds_locked:
             milestone.refunded = True
-            gl.ContractAt(milestone.client).emit_transfer(milestone.amount)
+            _pay_out(milestone.client, milestone.amount)
 
     # -----------------------------------------------------------------
     # Read-only views

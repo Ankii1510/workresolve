@@ -347,6 +347,23 @@ def can_cancel_from_accepted(now_unix: int, deadline_unix: int) -> bool:
     return now_unix >= deadline_unix
 
 
+def can_submit_work(now_unix: int, deadline_unix: int) -> bool:
+    """A freelancer may only submit (or re-submit) work strictly before the
+    milestone's deadline. Mirrors submit_work() in contracts/workresolve.py.
+
+    This is the exact complement of can_cancel_from_accepted() at the
+    boundary: at now_unix == deadline_unix, this returns False (submission
+    is blocked) and can_cancel_from_accepted() returns True (cancellation is
+    allowed) — the two can never both permit action on the same milestone at
+    the same instant, and there is never an instant where neither applies
+    and the milestone is stuck. This closes a reviewer-flagged gap: before
+    this check existed, a freelancer could submit work after the deadline
+    had already passed, which — because submitting moves the milestone out
+    of ACCEPTED into SUBMITTED, a state cancel_milestone() does not accept —
+    could strand the client with no way to cancel and get a refund."""
+    return now_unix < deadline_unix
+
+
 def refund_applies_on_cancel(state_before_cancel: str) -> bool:
     """Funds are locked in escrow from FUNDED onward (ACCEPTED always
     implies FUNDED happened first), so cancelling from either state must

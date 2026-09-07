@@ -64,6 +64,31 @@ for this release and belongs on the roadmap (see `README.md` "Roadmap"), not in 
   in time." instead, with a note to check the explorer before assuming a redo is needed. Test suite
   grew from 149/149 to 152/152 frontend unit tests as part of this fix.
 
+- **GenLayer reviewer feedback addressed: confirmed native transfer mechanism, deadline-gated
+  submission, and deterministic funded-lifecycle tests.** Submitting `contracts/workresolve.py` for
+  project credit on GenLayer's own submission portal, a reviewer flagged three real gaps:
+  1. The contract's outbound transfer call, `gl.ContractAt(recipient).emit_transfer(amount)`, was an
+     invented API that does not exist in GenLayer's real SDK. Replaced with `_pay_out()` /
+     `_ExternalRecipient(...).emit_transfer(value=...)`, matching the "Faucet" example on GenLayer's
+     own "Value Transfers" documentation page verbatim (see `docs/contracts.md` "Escrow
+     Architecture" for the exact citation).
+  2. `submit_work` had no deadline check at all, so a freelancer could submit (or re-submit) work
+     after `milestone.deadline` had passed — and because submitting moves the milestone into
+     `SUBMITTED`, a state `cancel_milestone` does not accept, this could permanently strand a
+     client's escrowed funds with no way to cancel. `submit_work` now rejects any submission once
+     `_now_unix() >= int(milestone.deadline)`, the exact complement of `cancel_milestone`'s own
+     deadline check, so the client's cancellation right is preserved.
+  3. Added a fully deterministic (no-LLM, always-executing) funded-lifecycle test —
+     `TestCancelMilestone::test_can_cancel_and_get_refunded_after_deadline_with_no_submission` in
+     `contracts/tests/test_workresolve.py` — proving the confirmed transfer mechanism actually moves
+     escrowed funds back to the client once a deadline passes with no submission, without depending
+     on live LLM evaluation output the way `release_payment`/`refund_client`'s own tests must.
+  `contracts/tests_logic` grew from 90/90 to 94/94 real, executed, passing tests as part of this fix
+  (`can_submit_work` and its four unit tests). The gltest-based integration file
+  (`contracts/tests/test_workresolve.py`) still requires a live GenVM network to actually run — see
+  that file's own module docstring for exact run instructions and an honest breakdown of which tests
+  are deterministic versus LLM-dependent.
+
 ## What's explicitly NOT in v0.1.0-testnet
 
 - No live deployment. No contract address exists on any network. No production frontend URL

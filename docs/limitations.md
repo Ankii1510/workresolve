@@ -16,12 +16,15 @@ stands today are listed — nothing here is a generic disclaimer.
   live contract, so `evaluate_and_finalize`'s real `gl.exec_prompt`/`gl.get_webpage` calls and real
   validator consensus remain unexercised in practice — every claim about contract correctness,
   evaluation behavior, and escrow accounting is still verified only at the deterministic
-  pure-Python logic level (90/90 tests in `contracts/tests_logic`) plus this one deployment
+  pure-Python logic level (94/94 tests in `contracts/tests_logic`) plus this one deployment
   transaction, not a full live run.
-- **`gl.ContractAt(...).emit_transfer(...)`, the mechanism that actually moves funds out of the
-  contract, has not yet been exercised against the live deployment.** This is the single
-  highest-priority item to verify next, via a real funded milestone and settlement — see
-  `docs/contracts.md` "Known Limitations."
+- **The outbound transfer mechanism now matches GenLayer's documented API, but still needs a live-
+  network run to confirm end to end.** A GenLayer reviewer flagged the earlier
+  `gl.ContractAt(...).emit_transfer(...)` call as not a real API; it has been replaced with
+  `_pay_out()` / `_ExternalRecipient(...).emit_transfer(value=...)`, matching GenLayer's own "Value
+  Transfers" documentation. This is the single highest-priority item to verify next against the live
+  deployment, via `contracts/tests/test_workresolve.py::TestCancelMilestone`'s two deterministic
+  (no-LLM) refund tests — see `docs/contracts.md` "Known Limitations."
 - **Wallet and browser edge cases (locked wallet, mid-session account/network switch, browser
   refresh during a pending transaction) were verified by code review, not live manual testing.** No
   browser automation was used in any phase of this project.

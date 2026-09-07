@@ -375,16 +375,14 @@ this review alongside the contract and frontend findings.
   `checkSubmitEligibility` are UX conveniences only, never the actual
   security boundary — see `docs/frontend.md` "Security".
 
-**Known MVP limitations, not resolved in this phase** (see also
-`docs/contracts.md` "Known Limitations"): no submission history/audit trail
-(overwritten on resubmission); no resubmission attempt cap; the native-value
-transfer path (`gl.ContractAt(...).emit_transfer(...)`) used by
-`release_payment`/`refund_client` remains the contract's single
-least-confirmed line, unverifiable without a live GenVM run; and this
-phase's evaluation flow has never executed against a live GenLayer network —
-every claim above about the contract's *behavior* is a static-code
-guarantee (verified by the pure-logic + prompt-injection test suites), not
-an observed one.
+**Known MVP limitations** (see also `docs/contracts.md` "Known Limitations"): no submission
+history/audit trail (overwritten on resubmission); no resubmission attempt cap; the native-value
+transfer path used by `release_payment`/`refund_client` (`_pay_out()` /
+`_ExternalRecipient(...).emit_transfer(value=...)`) now matches GenLayer's own documented API — a
+reviewer-flagged, invented `gl.ContractAt(...)` call was replaced — but is still unverified without a
+live GenVM run; and this phase's evaluation flow has never executed against a live GenLayer network —
+every claim above about the contract's *behavior* is a static-code guarantee (verified by the
+pure-logic + prompt-injection test suites), not an observed one.
 
 ## Testing
 
