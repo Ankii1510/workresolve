@@ -97,20 +97,19 @@ https://github.com/Ankii1510/workresolve
 
 ## Contract
 
-**Deployed, redeployment pending.** Network: GenLayer Asimov Testnet (`testnet-asimov`, chain id
-`4221`). The address and transaction below are the *original* deployment: `0x9F3B3360a4219A276ba76600e1CCD7B924eDC6C0`,
-tx `0xbcb13223a03a32a23adf217727adcc6884002d08c2e98c44fbebf2a19ced72dc`. Explorer:
-https://explorer-asimov.genlayer.com/. Following reviewer feedback on the initial submission, three
-fixes were made to `contracts/workresolve.py`: the native-currency transfer mechanism now matches
-GenLayer's own documented API (see `docs/contracts.md` "Escrow Architecture"); `submit_work` rejects
-any submission made after a milestone's deadline, preserving the client's cancellation right; and the
-contract now opts into GenLayer's own upgradability mechanism (see `docs/contracts.md`
-"Upgradability") so that no future fix needs another redeployment. Because none of this can take
-effect on an already-deployed contract, a fresh deployment is required and pending — this section
-will be updated with the new address once it happens. See `docs/release-notes.md` "Post-launch
-fixes" and "Blockers to v1.0.0" for the full explanation and remaining status (a real, end-to-end
-two-wallet APPROVE/REJECT lifecycle, and a live-network run of the deterministic funded-lifecycle
-refund tests, both against the new deployment).
+**Deployed.** Network: GenLayer Asimov Testnet (`testnet-asimov`, chain id `4221`). Address:
+`0x7BB7A6D936Fd72149424AE3681304dBc4E575B79`. Deployment transaction:
+`0x60845f0b3a6d037fa327ff885ac6e666f3594475f7cf32614b99560233e4fe46`. Explorer:
+https://explorer-asimov.genlayer.com/. This is a redeployment addressing reviewer feedback on the
+initial submission: the native-currency transfer mechanism now matches GenLayer's own documented API
+(see `docs/contracts.md` "Escrow Architecture"); `submit_work` rejects any submission made after a
+milestone's deadline, preserving the client's cancellation right; and the contract now opts into
+GenLayer's own upgradability mechanism (see `docs/contracts.md` "Upgradability") so that no future
+fix needs another redeployment. The original deployment
+(`0x9F3B3360a4219A276ba76600e1CCD7B924eDC6C0`) predates these fixes and is superseded. See
+`docs/release-notes.md` "Post-launch fixes" and "Blockers to v1.0.0" for the full explanation and
+remaining status (a real, end-to-end two-wallet APPROVE/REJECT lifecycle, and a live-network run of
+the deterministic funded-lifecycle refund tests, both against this new deployment).
 
 ## Testnet
 

@@ -5,26 +5,29 @@ stands today are listed — nothing here is a generic disclaimer.
 
 ## Environment / verification
 
-- **The contract is now deployed on GenLayer's real Asimov Testnet** (address
-  `0x9F3B3360a4219A276ba76600e1CCD7B924eDC6C0`, tx
-  `0xbcb13223a03a32a23adf217727adcc6884002d08c2e98c44fbebf2a19ced72dc` — see
+- **The contract is deployed on GenLayer's real Asimov Testnet** (current address
+  `0x7BB7A6D936Fd72149424AE3681304dBc4E575B79`, tx
+  `0x60845f0b3a6d037fa327ff885ac6e666f3594475f7cf32614b99560233e4fe46` — see
   `docs/genlayer-integration.md`), deployed via the official `genlayer` CLI from a machine with real
-  network access. This development sandbox itself still has no `genlayer.com` network egress and no
-  reachable Docker daemon, so the deployment and any live-network testing from here on must
-  continue to happen from a machine with real access, not from this sandbox. As of this deployment,
-  no milestone lifecycle (fund → accept → submit → evaluate → settle) has yet been run against the
-  live contract, so `evaluate_and_finalize`'s real `gl.exec_prompt`/`gl.get_webpage` calls and real
-  validator consensus remain unexercised in practice — every claim about contract correctness,
-  evaluation behavior, and escrow accounting is still verified only at the deterministic
-  pure-Python logic level (94/94 tests in `contracts/tests_logic`) plus this one deployment
-  transaction, not a full live run.
+  network access. This is a redeployment: the original deployment
+  (`0x9F3B3360a4219A276ba76600e1CCD7B924eDC6C0`) predates reviewer-driven fixes to the transfer
+  mechanism, deadline handling, and upgradability, and is superseded. This development sandbox itself
+  still has no `genlayer.com` network egress and no reachable Docker daemon, so the deployment and
+  any live-network testing from here on must continue to happen from a machine with real access, not
+  from this sandbox. As of this deployment, no milestone lifecycle (fund → accept → submit →
+  evaluate → settle) has yet been run against the live contract, so `evaluate_and_finalize`'s real
+  `gl.exec_prompt`/`gl.get_webpage` calls and real validator consensus remain unexercised in
+  practice — every claim about contract correctness, evaluation behavior, and escrow accounting is
+  still verified only at the deterministic pure-Python logic level (94/94 tests in
+  `contracts/tests_logic`) plus this one deployment transaction, not a full live run.
 - **The outbound transfer mechanism now matches GenLayer's documented API, but still needs a live-
   network run to confirm end to end.** A GenLayer reviewer flagged the earlier
   `gl.ContractAt(...).emit_transfer(...)` call as not a real API; it has been replaced with
   `_pay_out()` / `_ExternalRecipient(...).emit_transfer(value=...)`, matching GenLayer's own "Value
-  Transfers" documentation. This is the single highest-priority item to verify next against the live
-  deployment, via `contracts/tests/test_workresolve.py::TestCancelMilestone`'s two deterministic
-  (no-LLM) refund tests — see `docs/contracts.md` "Known Limitations."
+  Transfers" documentation, and shipped in the redeployment above. This is the single
+  highest-priority item to verify next against the live deployment, via
+  `contracts/tests/test_workresolve.py::TestCancelMilestone`'s two deterministic (no-LLM) refund
+  tests — see `docs/contracts.md` "Known Limitations."
 - **Wallet and browser edge cases (locked wallet, mid-session account/network switch, browser
   refresh during a pending transaction) were verified by code review, not live manual testing.** No
   browser automation was used in any phase of this project.
