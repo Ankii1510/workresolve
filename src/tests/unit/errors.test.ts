@@ -59,4 +59,20 @@ describe("toAppError", () => {
     const result = toAppError(new TypeError("Failed to fetch"));
     expect(result.code).toBe("RPC_ERROR");
   });
+
+  it("maps genlayer-js's raw 'Requested resource not found.' RPC error to a friendly GENLAYER_UNAVAILABLE message", () => {
+    // This is viem's ResourceNotFoundRpcError shortMessage, surfaced verbatim by
+    // genlayer-js's gen_call-based readContract when the RPC node hasn't caught up
+    // on a contract yet (commonly right after a fresh deployment). Regression
+    // coverage for the dashboard showing this raw string instead of an explanation.
+    const result = toAppError(new Error("Requested resource not found."));
+    expect(result.code).toBe("GENLAYER_UNAVAILABLE");
+    expect(result.message).not.toBe("Requested resource not found.");
+    expect(result.message).toMatch(/deployment|redeployment/i);
+  });
+
+  it("maps a -32001 coded RPC error object to GENLAYER_UNAVAILABLE even without the exact message", () => {
+    const result = toAppError({ code: -32001, message: "some other wording" });
+    expect(result.code).toBe("GENLAYER_UNAVAILABLE");
+  });
 });

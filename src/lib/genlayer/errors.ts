@@ -44,6 +44,28 @@ const INSUFFICIENT_BALANCE_PATTERNS = [
 const NETWORK_ERROR_PATTERNS = [/network error/i, /failed to fetch/i, /networkerror/i, /econnrefused/i];
 const TIMEOUT_PATTERNS = [/timeout/i, /timed out/i];
 
+/** EIP-1474 JSON-RPC error code -32001 ("Resource not found") / viem's
+ * `ResourceNotFoundRpcError` (shortMessage: "Requested resource not
+ * found."). Confirmed by reading genlayer-js@1.1.8's own source
+ * (node_modules/genlayer-js/dist/index.js): every contract read goes
+ * through a custom `gen_call` JSON-RPC method, and this is the raw error
+ * GenLayer's node sends back over that method — most often seen for a
+ * contract address the specific RPC node hasn't caught up on yet (e.g.
+ * immediately after a fresh deployment/redeployment), not a bug in this
+ * app's own request. Before this was recognized here, it fell all the way
+ * through to the generic UNKNOWN fallback in lib/utils/errors.ts, which
+ * shows the raw viem message verbatim — confusing and not actionable. */
+const RESOURCE_NOT_FOUND_CODE = -32001;
+
+export function isResourceNotFoundError(error: unknown): boolean {
+  if (typeof error === "object" && error !== null) {
+    const code = (error as { code?: unknown }).code;
+    if (code === RESOURCE_NOT_FOUND_CODE) return true;
+  }
+  const message = extractMessage(error) ?? "";
+  return /requested resource not found/i.test(message);
+}
+
 /** Maps a substring of a contract revert reason to a short, user-facing
  * explanation. Order matters — more specific patterns first. Every pattern
  * here is taken verbatim from a `raise ValueError(...)` message in
@@ -160,6 +182,15 @@ export function classifyBlockchainError(error: unknown): AppError | null {
     return {
       code: "RPC_ERROR",
       message: "Couldn't reach the GenLayer network. Check your connection and try again.",
+      cause: error,
+    };
+  }
+  if (isResourceNotFoundError(error)) {
+    return {
+      code: "GENLAYER_UNAVAILABLE",
+      message:
+        "The GenLayer network hasn't picked up this contract's latest state yet. This is expected for a " +
+        "few minutes right after a deployment or redeployment — please wait a bit and try again.",
       cause: error,
     };
   }
