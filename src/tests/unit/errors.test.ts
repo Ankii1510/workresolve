@@ -75,4 +75,24 @@ describe("toAppError", () => {
     const result = toAppError({ code: -32001, message: "some other wording" });
     expect(result.code).toBe("GENLAYER_UNAVAILABLE");
   });
+
+  it("maps GenLayer's 'failed to get contract state / latest accepted transaction' RPC error to a friendly, non-misleading GENLAYER_UNAVAILABLE message", () => {
+    // Reproduced verbatim via `npx genlayer call <address> get_milestone --args 1`
+    // directly (no frontend involved) on 2026-09-08 while GenLayer's Asimov testnet
+    // had stuck/idle transactions against this contract — a real node-side liveness
+    // issue, not anything wrong with the request. Before this was recognized here,
+    // the dashboard showed viem's raw shortMessage verbatim ("Missing or invalid
+    // parameters. Double check you have provided the correct parameters."), which
+    // is actively misleading since no parameter was ever wrong.
+    const result = toAppError(
+      new Error(
+        "Missing or invalid parameters.\nDouble check you have provided the correct parameters.\n" +
+          "Details: execution failed: failed to get contract state: getting latest accepted transaction: " +
+          "failed to get latest accepted transactions: caller error\nexecution reverted",
+      ),
+    );
+    expect(result.code).toBe("GENLAYER_UNAVAILABLE");
+    expect(result.message).not.toContain("Missing or invalid parameters");
+    expect(result.message).toMatch(/not.{0,20}problem with anything you entered|not.{0,10}app-side/i);
+  });
 });

@@ -66,6 +66,32 @@ export function isResourceNotFoundError(error: unknown): boolean {
   return /requested resource not found/i.test(message);
 }
 
+/** GenLayer's node itself failing to resolve a contract's current state
+ * because it can't fetch "the latest accepted transaction" for that
+ * address. Confirmed real, not app-side: reproduced with the exact same
+ * message via `npx genlayer call <address> get_milestone --args 1` directly
+ * (no frontend involved) on 2026-09-08, while two `fund_milestone`
+ * transactions against this contract were stuck in `NOT_VOTED`/idle limbo
+ * (0/5 validators ever voted) — see docs/limitations.md. `genlayer finalize`
+ * on those stuck transactions also reverted at GenLayer's own consensus
+ * contract layer (EVM revert, unrelated to this app's code), which is
+ * consistent with this being a GenLayer Asimov testnet-side liveness issue,
+ * not anything wrong with WorkResolve's contract or this frontend's request.
+ * Before this was recognized here, it fell through to the generic UNKNOWN
+ * fallback, which showed viem's raw, actively misleading shortMessage —
+ * "Missing or invalid parameters. Double check you have provided the
+ * correct parameters." — even though no parameter was ever wrong. */
+const CONTRACT_STATE_UNAVAILABLE_PATTERNS = [
+  /failed to get contract state/i,
+  /getting latest accepted transaction/i,
+  /failed to get latest accepted transactions?/i,
+];
+
+export function isContractStateUnavailableError(error: unknown): boolean {
+  const message = extractMessage(error) ?? "";
+  return CONTRACT_STATE_UNAVAILABLE_PATTERNS.some((p) => p.test(message));
+}
+
 /** Maps a substring of a contract revert reason to a short, user-facing
  * explanation. Order matters — more specific patterns first. Every pattern
  * here is taken verbatim from a `raise ValueError(...)` message in
@@ -193,6 +219,17 @@ export function classifyBlockchainError(error: unknown): AppError | null {
         "this can briefly mean the network hasn't caught up yet — wait a bit and try again. If it doesn't " +
         "clear up, it usually means the deployment itself never finished successfully (see " +
         "docs/limitations.md's note on GenVM's runner-comment parsing for a real example of this).",
+      cause: error,
+    };
+  }
+  if (isContractStateUnavailableError(error)) {
+    return {
+      code: "GENLAYER_UNAVAILABLE",
+      message:
+        "GenLayer's network can't currently resolve this contract's latest state — this is not a " +
+        "problem with anything you entered. It's usually a temporary liveness issue on GenLayer's " +
+        "testnet (validators not picking up a transaction). Wait a bit and try again; if it persists, " +
+        "see docs/limitations.md for how this was confirmed to be network-side, not app-side.",
       cause: error,
     };
   }

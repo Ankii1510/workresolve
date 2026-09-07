@@ -78,6 +78,26 @@ stands today are listed — nothing here is a generic disclaimer.
   `txExecutionResultName: FINISHED_WITH_RETURN`, and `genlayer code 0x1425...` now returns the
   corrected source (`import hashlib`, `hashlib.sha256(...)` in `_hash_requirements`, `gl.hash` gone)
   at the same address as before — no new deployment, no new address to update anywhere.
+- **CONFIRMED NETWORK-SIDE, NOT AN APP BUG: GenLayer's Asimov testnet itself had a liveness issue on
+  2026-09-08, right after the `gl.hash` fix above went live.** The very first real `create_milestone`
+  against the fixed, upgraded contract succeeded (`FINISHED_WITH_RETURN`), proving the fix works. Two
+  subsequent `fund_milestone` attempts, however, both finalized as `NOT_VOTED`/`IDLE` with **zero**
+  validators ever voting (`votesCommitted: 0, votesRevealed: 0`) — the network never picked the
+  transactions up at all. After that, every read against this contract (`get_milestone`,
+  `get_milestones_by_client`/`_by_freelancer`) started failing with `execution failed: failed to get
+  contract state: getting latest accepted transaction: failed to get latest accepted transactions:
+  caller error`. This was reproduced with `npx genlayer call <address> get_milestone --args 1`
+  directly — no frontend involved — ruling out an app-side cause. `npx genlayer finalize <txId>` on
+  the two stuck transactions was also attempted, to try to unstick the queue; it failed too, reverting
+  at GenLayer's own on-chain consensus contract (an EVM-level revert, `data: '0x90cb8b61'`), which is
+  further evidence this is GenLayer's Asimov testnet infrastructure, not this app or its contract. No
+  code fix exists for this on WorkResolve's side — it requires GenLayer's own network to recover
+  and/or its team to look at the stuck transactions. **What WAS fixed**: `classifyBlockchainError`
+  used to have no pattern for this specific RPC message, so it fell through to the generic fallback
+  and showed viem's raw, actively misleading `shortMessage` — "Missing or invalid parameters. Double
+  check you have provided the correct parameters." — on the dashboard, even though no parameter was
+  ever wrong. It now recognizes this message and shows an accurate explanation instead (see
+  `isContractStateUnavailableError` in `src/lib/genlayer/errors.ts`).
 - **`classifyBlockchainError` (`src/lib/genlayer/errors.ts`) now recognizes GenLayer's raw
   "Requested resource not found." RPC error (code `-32001`) instead of showing it verbatim** — this
   is what first surfaced the deployment bug above (it showed up as this raw error on the dashboard).
