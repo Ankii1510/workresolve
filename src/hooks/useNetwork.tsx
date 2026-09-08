@@ -25,6 +25,7 @@
 import { createContext, useCallback, useContext, useMemo, useSyncExternalStore, type ReactNode } from "react";
 import {
   getActiveNetworkName,
+  readSeedNetworkName,
   setActiveNetworkName,
   SELECTABLE_NETWORKS,
   type GenLayerNetworkName,
@@ -87,12 +88,35 @@ function notify(): void {
 }
 
 export function NetworkProvider({ children }: { children: ReactNode }) {
-  // getActiveNetworkName() is itself SSR-safe (it checks `typeof window`
-  // internally and returns the build's seed default when there's no
-  // localStorage to read), so it doubles as both the client snapshot and
-  // the server snapshot here — no separate SSR-only variant needed, and no
-  // post-mount reconciliation effect required.
-  const networkName = useSyncExternalStore(subscribe, getActiveNetworkName, getActiveNetworkName);
+  // REAL, CONFIRMED BUG (found live, 2026-09-08) — DO NOT pass
+  // getActiveNetworkName as the THIRD (getServerSnapshot) argument again.
+  //
+  // getServerSnapshot must return the exact same value the server rendered,
+  // every time it's called — including when React calls it on the CLIENT
+  // during hydration, purely to check the DOM for a mismatch. This file
+  // used to pass getActiveNetworkName for both the second AND third
+  // arguments. getActiveNetworkName() reads localStorage whenever `window`
+  // exists — which is true on the client even during that hydration check —
+  // so a person with a previously-stored network choice got a
+  // getServerSnapshot() that returned their STORED network, while the
+  // actual server-rendered HTML was built from the seed default
+  // (readSeedNetworkName()), since the server has no `window`/localStorage
+  // at all. That mismatch is exactly what React's hydration algorithm
+  // exists to catch: it threw "Minified React error #418" (hydration
+  // failed) in production, which forces a full client-side remount of the
+  // tree — discarding wallet/provider state mid-flight and surfacing as
+  // unrelated-looking failures elsewhere (e.g. a wallet write request
+  // failing with a generic "internal error" right after signing, reported
+  // against a live Studio deployment).
+  //
+  // Fix: getServerSnapshot is now readSeedNetworkName, which NEVER touches
+  // localStorage — it only reads the build's env var, so it is
+  // deterministic across server and client and matches the actual
+  // server-rendered HTML every time. getActiveNetworkName (the real,
+  // localStorage-aware value) remains the second argument, so the person's
+  // stored choice still applies — just correctly, in a post-hydration
+  // client re-render rather than baked into the hydration check itself.
+  const networkName = useSyncExternalStore(subscribe, getActiveNetworkName, readSeedNetworkName);
 
   const setNetworkName = useCallback((name: GenLayerNetworkName) => {
     setActiveNetworkName(name);

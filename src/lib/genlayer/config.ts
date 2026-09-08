@@ -65,8 +65,15 @@ function isNetworkName(value: string): value is GenLayerNetworkName {
 /** The build's seed default, from NEXT_PUBLIC_GENLAYER_NETWORK — only used
  * before a person has ever picked a network in this browser. Throws for an
  * unrecognized value so a typo in deployment config fails loudly rather
- * than silently falling back. */
-function readSeedNetworkName(): GenLayerNetworkName {
+ * than silently falling back.
+ *
+ * Exported specifically so it can serve as `useSyncExternalStore`'s
+ * `getServerSnapshot` in useNetwork.tsx (see that file's REAL, CONFIRMED BUG
+ * comment) — it must NEVER read localStorage, only env vars, so it returns
+ * the exact same value on the server and during the client's hydration
+ * check, regardless of what's stored in this browser.
+ */
+export function readSeedNetworkName(): GenLayerNetworkName {
   const raw = process.env.NEXT_PUBLIC_GENLAYER_NETWORK?.trim();
   if (!raw) return DEFAULT_NETWORK_NAME;
   if (isNetworkName(raw)) return raw;

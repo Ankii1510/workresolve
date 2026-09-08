@@ -60,6 +60,26 @@ describe("getActiveNetworkName / getGenLayerConfig", () => {
     const { getGenLayerConfig } = await import("@/lib/genlayer/config");
     expect(getGenLayerConfig().networkName).toBe("studionet");
   });
+
+  it("readSeedNetworkName() ignores a stored browser choice entirely, even when one exists", async () => {
+    // REAL, CONFIRMED BUG (found live, 2026-09-08): useNetwork.tsx used to
+    // pass getActiveNetworkName (which reads localStorage) as
+    // useSyncExternalStore's getServerSnapshot. Because getServerSnapshot is
+    // also called on the CLIENT during hydration, that made the hydration
+    // check see a different value than the actual server-rendered HTML
+    // (which is always built from the seed default, since the server has no
+    // localStorage) whenever a person had a stored choice — causing a real
+    // hydration-mismatch crash (React error #418) in production. This test
+    // pins the fix: readSeedNetworkName() must NEVER be influenced by a
+    // stored browser choice, unlike getActiveNetworkName().
+    process.env.NEXT_PUBLIC_GENLAYER_NETWORK = "testnetAsimov";
+    const { readSeedNetworkName, getActiveNetworkName, setActiveNetworkName } = await import(
+      "@/lib/genlayer/config"
+    );
+    setActiveNetworkName("studionet");
+    expect(getActiveNetworkName()).toBe("studionet"); // the stored choice, as expected
+    expect(readSeedNetworkName()).toBe("testnetAsimov"); // the seed default, unaffected by storage
+  });
 });
 
 describe("per-network contract address resolution", () => {
