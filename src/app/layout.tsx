@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { NetworkProvider } from "@/hooks/useNetwork";
 import { WalletProvider } from "@/hooks/useWallet";
 import { ToastProvider } from "@/components/ui/Toast";
 import { Navbar } from "@/components/layout/Navbar";
@@ -21,11 +22,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" className="h-full antialiased">
       <body className="flex min-h-full flex-col bg-slate-50 text-slate-900">
         <ToastProvider>
-          <WalletProvider>
-            <Navbar />
-            <main className="flex-1">{children}</main>
-            <Footer />
-          </WalletProvider>
+          <NetworkProvider>
+            <WalletProvider>
+              <Navbar />
+              <main className="flex-1">{children}</main>
+              <Footer />
+            </WalletProvider>
+          </NetworkProvider>
         </ToastProvider>
       </body>
     </html>

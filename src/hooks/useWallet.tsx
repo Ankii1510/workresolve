@@ -30,7 +30,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { getGenLayerConfig } from "@/lib/genlayer/config";
+import { useNetwork } from "@/hooks/useNetwork";
 import {
   createWriteClient,
   getReadClient,
@@ -124,7 +124,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   // wallet to choose between.
   const [activeProvider, setActiveProvider] = useState<EthereumProvider | null>(null);
   const restoredRef = useRef(false);
-  const { chain } = getGenLayerConfig();
+  // Sourced from NetworkContext (not lib/genlayer/config.ts directly) so
+  // that switching networks in the UI (see NetworkSwitcher) immediately
+  // updates the expected chain here, and therefore the read/write clients
+  // and "wrong network" detection below.
+  const { networkName, chain } = useNetwork();
 
   // Discover every EIP-6963-announcing wallet. Kept subscribed for the
   // component's lifetime, not just at mount, since some extensions inject
@@ -291,12 +295,19 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   }, [activeProvider, chain]);
 
-  const readClient = useMemo(() => getReadClient(), []);
+  // `getReadClient()`/`createWriteClient()` both resolve the *currently
+  // active* network internally (lib/genlayer/config.ts), so `networkName`
+  // must be a dependency here even though it isn't passed as an argument —
+  // otherwise React would keep serving whichever client was memoized for
+  // the network active at first render, silently ignoring a network switch.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const readClient = useMemo(() => getReadClient(), [networkName]);
 
   const writeClient = useMemo(() => {
     if (!state.address || !activeProvider) return null;
     return createWriteClient(state.address as `0x${string}`, activeProvider);
-  }, [state.address, activeProvider]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.address, activeProvider, networkName]);
 
   const isCorrectNetwork = state.chainId === null ? false : state.chainId === chain.id;
   const isConnected = !!state.address;

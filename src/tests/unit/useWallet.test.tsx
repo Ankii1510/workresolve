@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
 import { WalletProvider, useWallet } from "@/hooks/useWallet";
+import { NetworkProvider } from "@/hooks/useNetwork";
 import type { ReactNode } from "react";
 
 /**
@@ -41,7 +42,11 @@ function makeFakeProvider(opts: { chainIdHex?: string; accounts?: string[] } = {
 }
 
 function wrapper({ children }: { children: ReactNode }) {
-  return <WalletProvider>{children}</WalletProvider>;
+  return (
+    <NetworkProvider>
+      <WalletProvider>{children}</WalletProvider>
+    </NetworkProvider>
+  );
 }
 
 /** Simulates a real EIP-6963-compliant wallet extension: listens for the

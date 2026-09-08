@@ -26,20 +26,28 @@ export interface EthereumProvider {
   removeListener: (event: string, handler: (...args: unknown[]) => void) => void;
 }
 
-let readClientSingleton: AppGenLayerClient | null = null;
+const readClientCache = new Map<string, AppGenLayerClient>();
 
 /**
- * A read-only client, safe to use with no wallet connected. Cached as a
- * singleton per network config since it carries no per-user state.
+ * A read-only client, safe to use with no wallet connected. Cached per
+ * network config (a person can now switch networks at runtime — see
+ * lib/genlayer/config.ts's module docstring — so a single frozen singleton
+ * would keep serving the network active when this module first loaded).
+ * Keyed by network name + endpoint override so switching back to a
+ * previously-used network reuses its client instead of rebuilding it.
  */
 export function getReadClient(): AppGenLayerClient {
-  if (readClientSingleton) return readClientSingleton;
-  const { chain, endpointOverride } = getGenLayerConfig();
-  readClientSingleton = createClient({
+  const { networkName, chain, endpointOverride } = getGenLayerConfig();
+  const cacheKey = `${networkName}|${endpointOverride ?? ""}`;
+  const cached = readClientCache.get(cacheKey);
+  if (cached) return cached;
+
+  const client = createClient({
     chain,
     ...(endpointOverride ? { endpoint: endpointOverride } : {}),
   });
-  return readClientSingleton;
+  readClientCache.set(cacheKey, client);
+  return client;
 }
 
 /**

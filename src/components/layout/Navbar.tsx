@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useWallet } from "@/hooks/useWallet";
 import { WalletConnectButton } from "@/components/wallet/WalletConnectButton";
+import { NetworkSwitcher } from "@/components/layout/NetworkSwitcher";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils/cn";
 
@@ -46,9 +47,12 @@ export function Navbar() {
         </nav>
 
         <div className="flex items-center gap-2">
-          {wallet.isConnected && (
-            <Badge tone={wallet.isCorrectNetwork ? "neutral" : "warning"} className="hidden sm:inline-flex">
-              {wallet.expectedNetworkName}
+          <div className="hidden sm:block">
+            <NetworkSwitcher />
+          </div>
+          {wallet.isConnected && !wallet.isCorrectNetwork && (
+            <Badge tone="warning" className="hidden sm:inline-flex">
+              Wrong network
             </Badge>
           )}
           <WalletConnectButton />
@@ -88,6 +92,9 @@ export function Navbar() {
             {link.label}
           </Link>
         ))}
+        <div className="px-2 pt-2">
+          <NetworkSwitcher />
+        </div>
       </nav>
     </header>
   );
