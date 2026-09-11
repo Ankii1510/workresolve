@@ -82,6 +82,45 @@ describe("getActiveNetworkName / getGenLayerConfig", () => {
   });
 });
 
+describe("getSelectableNetworks", () => {
+  // Before this filtering existed, the switcher always offered all three
+  // candidates — including testnetBradbury, which this project has never
+  // deployed to. Picking it did nothing except produce "not deployed on this
+  // network yet". A menu should only contain things that work.
+  it("offers only networks that actually have a contract address configured", async () => {
+    process.env.NEXT_PUBLIC_WORKRESOLVE_CONTRACT_ADDRESS_STUDIONET = STUDIO_ADDRESS;
+    process.env.NEXT_PUBLIC_WORKRESOLVE_CONTRACT_ADDRESS_TESTNET_ASIMOV = ASIMOV_ADDRESS;
+    const { getSelectableNetworks } = await import("@/lib/genlayer/config");
+    expect(getSelectableNetworks()).toEqual(["studionet", "testnetAsimov"]);
+  });
+
+  it("drops a network as soon as its address is not configured", async () => {
+    process.env.NEXT_PUBLIC_WORKRESOLVE_CONTRACT_ADDRESS_STUDIONET = STUDIO_ADDRESS;
+    const { getSelectableNetworks } = await import("@/lib/genlayer/config");
+    expect(getSelectableNetworks()).toEqual(["studionet"]);
+  });
+
+  it("keeps Studio first, since it is the product default", async () => {
+    process.env.NEXT_PUBLIC_WORKRESOLVE_CONTRACT_ADDRESS_STUDIONET = STUDIO_ADDRESS;
+    process.env.NEXT_PUBLIC_WORKRESOLVE_CONTRACT_ADDRESS_TESTNET_ASIMOV = ASIMOV_ADDRESS;
+    const { getSelectableNetworks } = await import("@/lib/genlayer/config");
+    expect(getSelectableNetworks()[0]).toBe("studionet");
+  });
+
+  it("never returns an empty menu, even with nothing configured at all", async () => {
+    // An empty <select> is a worse failure than one that leads to a clear,
+    // actionable configuration error.
+    const { getSelectableNetworks } = await import("@/lib/genlayer/config");
+    expect(getSelectableNetworks()).toEqual(["studionet"]);
+  });
+
+  it("never offers localnet, which is a developer-only network", async () => {
+    process.env.NEXT_PUBLIC_WORKRESOLVE_CONTRACT_ADDRESS_LOCALNET = STUDIO_ADDRESS;
+    const { getSelectableNetworks } = await import("@/lib/genlayer/config");
+    expect(getSelectableNetworks()).not.toContain("localnet");
+  });
+});
+
 describe("per-network contract address resolution", () => {
   it("resolves each network's own address from its own env var, independently", async () => {
     process.env.NEXT_PUBLIC_WORKRESOLVE_CONTRACT_ADDRESS_STUDIONET = STUDIO_ADDRESS;

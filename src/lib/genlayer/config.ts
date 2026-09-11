@@ -25,7 +25,7 @@
  * compiled with, the app now lets a person choose their network from the UI
  * (see `useNetwork()` / `NetworkSwitcher`), persisted per-browser in
  * localStorage — same pattern as `src/lib/activity.ts`. `studionet` is the
- * hardcoded, always-first default (see `SELECTABLE_NETWORKS` below) for
+ * hardcoded, always-first default (see `getSelectableNetworks()` below) for
  * exactly this reliability reason, regardless of what
  * `NEXT_PUBLIC_GENLAYER_NETWORK` resolves to — that env var still exists as
  * the *build's* seed default (used only until a person picks something
@@ -43,13 +43,38 @@ const NETWORKS: Record<GenLayerNetworkName, GenLayerChain> = {
   testnetBradbury,
 };
 
-/** Networks offered in the UI's network switcher, in display order. Studio
- * is deliberately first/default (see module docstring). `localnet` is
- * excluded here — it means a locally-running GenVM Studio/Docker instance,
- * which only makes sense for someone developing this repo directly, never
- * for a visitor to the deployed app; it remains fully supported via
- * NEXT_PUBLIC_GENLAYER_NETWORK for that use case. */
-export const SELECTABLE_NETWORKS: GenLayerNetworkName[] = ["studionet", "testnetAsimov", "testnetBradbury"];
+/** Networks this app is willing to offer, in display order. Studio is
+ * deliberately first/default (see module docstring). `localnet` is excluded —
+ * it means a locally-running GenVM Studio/Docker instance, which only makes
+ * sense for someone developing this repo directly, never for a visitor to the
+ * deployed app; it remains fully supported via NEXT_PUBLIC_GENLAYER_NETWORK
+ * for that case.
+ *
+ * This is the CANDIDATE list, not what the switcher shows — see
+ * getSelectableNetworks(). */
+const CANDIDATE_NETWORKS: GenLayerNetworkName[] = ["studionet", "testnetAsimov", "testnetBradbury"];
+
+/**
+ * The networks the switcher actually offers: the candidates above, minus any
+ * that have no contract address configured for this build.
+ *
+ * A network with no deployed address cannot do anything except produce
+ * `requireContractAddress()`'s "not deployed on this network yet" error the
+ * moment someone picks it. Offering it is offering a dead end — testnetBradbury
+ * has never been deployed to in this project and sat in the switcher regardless.
+ * Filtering by configured address means the menu describes what actually works,
+ * and keeps doing so on its own as deployments come and go: set a network's
+ * NEXT_PUBLIC_WORKRESOLVE_CONTRACT_ADDRESS_* variable and it appears, unset it
+ * and it is gone. No list to remember to edit.
+ *
+ * If nothing at all is configured (a misconfigured build), the default network
+ * is still returned rather than an empty menu — an empty `<select>` is a worse
+ * failure than one that leads to a clear, actionable configuration error.
+ */
+export function getSelectableNetworks(): GenLayerNetworkName[] {
+  const deployed = CANDIDATE_NETWORKS.filter((name) => readContractAddressForNetwork(name) !== null);
+  return deployed.length > 0 ? deployed : [DEFAULT_NETWORK_NAME];
+}
 
 /** Hardcoded product default — see module docstring for why this no longer
  * defers to NEXT_PUBLIC_GENLAYER_NETWORK as the *effective* default a

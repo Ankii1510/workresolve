@@ -58,11 +58,50 @@
 #   - genlayer-test@0.1.1's bundled example contracts (wizard_of_coin.py,
 #     intelligent_oracle.py, llm_erc20.py, multi_tenant_storage.py, storage.py)
 # See the "Phase 4 API corrections" section at the top of docs/architecture.md
-# for the specific places this corrects Phase 1/2's assumptions (most
-# notably: `gl.get_webpage` / `gl.exec_prompt` / `gl.eq_principle_strict_eq` /
-# `gl.eq_principle_prompt_comparative` are FLAT names on the `gl` facade, not
-# nested under `gl.nondet.*` / `gl.eq_principle.*` as Phase 1's docs reading
-# assumed).
+# for the specific places this corrects Phase 1/2's assumptions.
+#
+# GENVM SDK NAMESPACES — READ THIS BEFORE TRUSTING ANY EXAMPLE CONTRACT.
+# THE PINNED RUNNER, NOT THE EXAMPLES PACKAGE, DEFINES THE API.
+#
+# The non-deterministic helpers are NESTED, not flat:
+#     gl.nondet.web.render(url, mode="text")        NOT gl.get_webpage(...)
+#     gl.nondet.exec_prompt(prompt)                 NOT gl.exec_prompt(...)
+#     gl.eq_principle.prompt_comparative(fn, principle)
+#                                                   NOT gl.eq_principle_prompt_comparative(fn, principle=...)
+# (note also: `principle` is POSITIONAL in the nested form).
+#
+# This file used the flat names through its first working deployment, and the
+# flat names were NOT invented — they are exactly what genlayer-test's own
+# bundled example contracts use, in the latest published version (0.1.2) as
+# well as 0.1.1. That is where the previous version of this comment got them,
+# and why it stated with confidence that flat was correct.
+#
+# They are simply stale. The API those examples target predates the runner
+# this contract pins in its `Depends` line above, and on THAT runner the flat
+# names do not exist at all. `evaluate_and_finalize` therefore reached the
+# live network, ran, and died every single time with:
+#
+#     File "/contract.py", line 727, in evaluate_and_finalize
+#       raw_result = gl.eq_principle_prompt_comparative(
+#     AttributeError: module 'genlayer.gl' has no attribute
+#                     'eq_principle_prompt_comparative'
+#
+# The transaction still "succeeded" in the consensus sense every time — the
+# milestone simply never advanced past SUBMITTED, which is what made this look
+# like a stuck network rather than a code bug.
+#
+# The corrected names are confirmed against BrickProof
+# (github.com/CodeWithShamim/BrickProof), an independent GenLayer contract that
+# performs the same kind of LLM-judged, consensus-backed evaluation and is live
+# and working — and which pins the *identical* runner hash to the one above.
+# Same runner + working nested calls + our failing flat calls is about as
+# conclusive as evidence gets without the SDK source in hand.
+#
+# RULE FOR NEXT TIME: a `gl.*` name copied from an example contract is a
+# hypothesis until it has run on this contract's pinned runner. `genlayer trace
+# <txHash>` prints the AttributeError verbatim and settles it in one command —
+# it is the cheapest check in this project and was what identified both this
+# bug and the `gl.hash` one before it.
 #
 # NATIVE VALUE TRANSFERS OUT OF THE CONTRACT (`release_payment` /
 # `refund_client` / `cancel_milestone`'s refund path): a GenLayer reviewer
@@ -659,7 +698,7 @@ class WorkResolve(gl.Contract):
                 if not url:
                     continue
                 try:
-                    content = gl.get_webpage(url, mode="text")
+                    content = gl.nondet.web.render(url, mode="text")
                     content = content[:MAX_FETCHED_CONTENT_CHARS]
                     fetched_sections.append(f"### {label}: {url}\n{content}")
                 except Exception as exc:  # noqa: BLE001 — deliberately broad: any fetch failure -> UNVERIFIABLE, never a crash
@@ -668,7 +707,7 @@ class WorkResolve(gl.Contract):
                 if not url:
                     continue
                 try:
-                    content = gl.get_webpage(url, mode="text")
+                    content = gl.nondet.web.render(url, mode="text")
                     content = content[:MAX_FETCHED_CONTENT_CHARS]
                     fetched_sections.append(f"### Evidence {i + 1}: {url}\n{content}")
                 except Exception as exc:  # noqa: BLE001
@@ -720,17 +759,20 @@ Freelancer's notes: {freelancer_notes if freelancer_notes else "(none provided)"
 
 {evidence_block}
 """
-            result = gl.exec_prompt(prompt)
+            result = gl.nondet.exec_prompt(prompt)
             result = result.replace("```json", "").replace("```", "").strip()
             return result
 
-        raw_result = gl.eq_principle_prompt_comparative(
+        # Principle passed POSITIONALLY, matching the working reference
+        # implementation this was corrected against (see the "GENVM SDK
+        # NAMESPACES" note at the top of this file). The old flat-name call
+        # used `principle=` as a keyword; both the name and the call shape
+        # changed, so do not reintroduce either half.
+        raw_result = gl.eq_principle.prompt_comparative(
             run_evaluation,
-            principle=(
-                "The `status` field for every requirement id must be exactly the same "
-                "across responses. Reasons may differ in wording but must describe the "
-                "same underlying facts."
-            ),
+            "The `status` field for every requirement id must be exactly the same "
+            "across responses. Reasons may differ in wording but must describe the "
+            "same underlying facts.",
         )
 
         try:

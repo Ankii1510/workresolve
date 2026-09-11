@@ -27,7 +27,7 @@ import {
   getActiveNetworkName,
   readSeedNetworkName,
   setActiveNetworkName,
-  SELECTABLE_NETWORKS,
+  getSelectableNetworks,
   type GenLayerNetworkName,
 } from "@/lib/genlayer/config";
 import type { GenLayerChain } from "genlayer-js/types";
@@ -51,7 +51,7 @@ export interface NetworkContextValue {
   networkName: GenLayerNetworkName;
   chain: GenLayerChain;
   /** Every network offered in the switcher UI, in display order — see
-   * SELECTABLE_NETWORKS for why `localnet` is excluded. */
+   * getSelectableNetworks() for why a network can be absent. */
   options: NetworkOption[];
   setNetworkName: (name: GenLayerNetworkName) => void;
 }
@@ -124,7 +124,7 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const options: NetworkOption[] = useMemo(
-    () => SELECTABLE_NETWORKS.map((name) => ({ name, label: CHAINS_BY_NAME[name].name })),
+    () => getSelectableNetworks().map((name) => ({ name, label: CHAINS_BY_NAME[name].name })),
     [],
   );
 

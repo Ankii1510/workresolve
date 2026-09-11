@@ -13,7 +13,7 @@ import { logDevError } from "@/lib/utils/errors";
  * liveness, while GenLayer's own hosted Studio network is a
  * centrally-operated simulator that stays reliable through exactly that
  * kind of incident. Studio is the default (see
- * lib/genlayer/config.ts's SELECTABLE_NETWORKS) for that reliability
+ * lib/genlayer/config.ts's getSelectableNetworks) for that reliability
  * reason, but the choice is always the person's — this is a plain,
  * always-visible `<select>`, not a setting buried in a menu.
  *
