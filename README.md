@@ -4,11 +4,12 @@ Decentralized escrow for freelance milestones, evaluated by [GenLayer](https://w
 Intelligent Contracts and decentralized validator consensus — instead of a single centralized
 "approve" button.
 
-> **Status: v0.1.0-testnet.** The contract is deployed and live on GenLayer's Asimov Testnet, and the
-> frontend is publicly live at https://workresolve.vercel.app/ — see "Testnet" below for the
-> address and transaction. No real, end-to-end APPROVE/REJECT milestone lifecycle has been run
-> against the live contract yet — see "Limitations" below for exactly what that means. See
-> `docs/release-notes.md` for the full version history and feature freeze.
+> **Status: v0.1.0-testnet.** The contract is deployed and live on **two** GenLayer networks — the
+> hosted Studio network (the app's default) and the Asimov Testnet — and the frontend is publicly
+> live at https://workresolve.vercel.app/ with an in-app network switcher. See "Networks" below for
+> both addresses. A milestone has been created and funded on Studio against the live contract; the
+> APPROVE/REJECT half of the lifecycle has not been completed end to end yet — see "Limitations"
+> below for exactly what that means. See `docs/release-notes.md` for the full version history.
 
 ## Problem
 
@@ -122,28 +123,41 @@ Only what's actually implemented and tested:
   contract's own reverse-index views; see [`docs/frontend.md`](./docs/frontend.md) "Event/Indexing
   Approach" for why that was a deliberate choice, not a gap.
 
-## Testnet
+## Networks
 
-- **Network**: GenLayer Asimov Testnet (alias `testnet-asimov`, chain id `4221`) — see
-  `src/lib/genlayer/config.ts`.
-- **Contract**: deployed and verified genuinely live. Address:
-  `0x14255277822815F43DA58271d8d28f0F844cf209`. Deployment transaction:
-  `0x85b326bb39ee766cb6f932ce9a098fbb37b158724f40184d268d4543b645f30a`. Deployed via the official
-  `genlayer` CLI from a machine with real network access — see
-  [`docs/genlayer-integration.md`](./docs/genlayer-integration.md) "GenLayer-specific proof." This is
-  the fourth deployment: three prior addresses
+The app ships with an in-app network switcher (`src/components/layout/NetworkSwitcher.tsx`). It
+offers only networks that actually have a contract address configured for the build, so a menu
+entry never leads to a "not deployed" dead end. **A contract deployed on one network does not exist
+on any other** — each network below has its own permanent address.
+
+**GenLayer Studio Network** (`studionet`, chain id `61999`) — the app's default.
+
+- **Contract**: `0xdD0b1E30D7934845D9B91633bDAD21fBF7A83a2e`
+- **Explorer**: https://explorer-studio.genlayer.com/address/0xdD0b1E30D7934845D9B91633bDAD21fBF7A83a2e
+- **Deployment transaction**: `0x08290ecb9002bfabb67d1cec1038deb38419dd6c3954adb15fc57541e732dc2b`
+  (GenVM result SUCCESS, consensus Accepted), deployed with
+  [`scripts/deploy-contract.mjs`](./scripts/deploy-contract.mjs), which takes the network as an
+  explicit argument and then verifies from the receipt's own shape that it landed on the intended
+  one — see `docs/limitations.md` for the day that check was written to prevent.
+
+**GenLayer Asimov Testnet** (`testnetAsimov`, chain id `4221`) — the real, decentralized testnet.
+
+- **Contract**: `0x14255277822815F43DA58271d8d28f0F844cf209`
+- **Explorer**: https://explorer-asimov.genlayer.com/address/0x14255277822815F43DA58271d8d28f0F844cf209
+- **Deployment transaction**: `0x85b326bb39ee766cb6f932ce9a098fbb37b158724f40184d268d4543b645f30a`.
+  This was the fourth deployment attempt: three prior addresses
   (`0x9F3B3360a4219A276ba76600e1CCD7B924eDC6C0`, `0x7BB7A6D936Fd72149424AE3681304dBc4E575B79`,
-  `0x8366417A85498fF3Ff8012E85Ab2DE7d6FE83b16`) each returned what looked like a normal success but
-  never actually finished deploying — two separate GenVM-level bugs in this file's own header
-  comment, root-caused with `genlayer receipt`/`genlayer trace` and fixed; see
-  `docs/limitations.md` for the full story. This one is confirmed live via `genlayer code`, which
-  returns the contract's actual source. Thanks to the upgradability now built into the contract
-  (and genuinely exercised this time), this should be the last time a fix requires a new address.
-- **Explorer**: https://explorer-asimov.genlayer.com/ (search the contract address or transaction
-  hash above); `src/lib/genlayer/explorer.ts` derives the same URL from the selected chain's
-  metadata.
-- **Frontend**: live at https://workresolve.vercel.app/, deployed on Vercel and pointed at the
-  contract address above via `NEXT_PUBLIC_WORKRESOLVE_CONTRACT_ADDRESS`.
+  `0x8366417A85498fF3Ff8012E85Ab2DE7d6FE83b16`) each reported success but never actually finished
+  deploying — two GenVM-level bugs in the contract's own header comment, root-caused with
+  `genlayer receipt` / `genlayer trace`; see `docs/limitations.md`.
+
+Both are confirmed live via `genlayer code`, which returns the contract's actual source. The
+contract is upgradeable (`upgrade()`), so a code fix is pushed to these same addresses with
+[`scripts/upgrade-contract.mjs`](./scripts/upgrade-contract.mjs) rather than redeployed — no address
+in this project should need reissuing again.
+
+- **Frontend**: live at https://workresolve.vercel.app/, deployed on Vercel, with each network's
+  address supplied by its own `NEXT_PUBLIC_WORKRESOLVE_CONTRACT_ADDRESS_*` variable (below).
 
 ## Getting Started
 
@@ -169,11 +183,28 @@ cp .env.example .env.local
 ```
 
 - `NEXT_PUBLIC_GENLAYER_NETWORK` — one of `localnet`, `studionet`, `testnetAsimov`,
-  `testnetBradbury`. Defaults to `studionet` (hosted simulator, no local setup) if unset.
+  `testnetBradbury`. This is only the *seed* default for a first-time visitor: once someone picks a
+  network in the in-app switcher, that choice is stored in their browser and wins. Defaults to
+  `studionet` (hosted simulator, no local setup) if unset.
 - `NEXT_PUBLIC_GENLAYER_RPC_URL` — optional override for the network's default RPC endpoint.
-- `NEXT_PUBLIC_WORKRESOLVE_CONTRACT_ADDRESS` — the deployed contract's address. Left unset, the app
+- `NEXT_PUBLIC_WORKRESOLVE_CONTRACT_ADDRESS_STUDIONET`,
+  `NEXT_PUBLIC_WORKRESOLVE_CONTRACT_ADDRESS_TESTNET_ASIMOV`,
+  `NEXT_PUBLIC_WORKRESOLVE_CONTRACT_ADDRESS_TESTNET_BRADBURY`,
+  `NEXT_PUBLIC_WORKRESOLVE_CONTRACT_ADDRESS_LOCALNET` — each network's own deployed address. A
+  network with no address set simply does not appear in the switcher. Left unset entirely, the app
   still runs and is fully browsable; any action that needs the contract shows a clear
   "not configured" error instead of crashing or faking a result.
+- `NEXT_PUBLIC_WORKRESOLVE_CONTRACT_ADDRESS` — legacy, unsuffixed, kept working as a fallback for
+  `testnetAsimov` only.
+
+> Put a network's address only in *that* network's variable. Nothing fails at build time if you
+> mix them up, reads can keep working against whichever network the address really belongs to, and
+> some wallets report the resulting write failure as nothing more useful than "an internal error" —
+> `docs/limitations.md` has the day that cost. Confirm an address on its own network's explorer
+> before pasting it anywhere.
+
+> Next.js inlines `NEXT_PUBLIC_*` variables at **build** time. Adding or changing one on Vercel has
+> no effect until a new deployment is built.
 
 Every `NEXT_PUBLIC_*` variable above is safe to expose to the browser by design — none of them is a
 secret. No variable in this project should ever hold a private key, seed phrase, or API secret; see
