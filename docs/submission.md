@@ -2,10 +2,11 @@
 
 **Completeness note, stated up front**: the contract is deployed to GenLayer's public Asimov
 Testnet and the frontend is publicly live on Vercel (see "Contract" and "Live Demo" below) — this
-package is no longer deployment-incomplete. The one thing still outstanding is a real, end-to-end
-two-wallet APPROVE/REJECT lifecycle recorded against the live contract; that section below remains
-marked accordingly rather than filled with an invented value — see `docs/limitations.md` and
-`docs/release-notes.md` "Blockers to v1.0.0."
+package is no longer deployment-incomplete. A real, end-to-end **two-wallet REJECT lifecycle** has
+now been run against the live Studio deployment, ending in a refund — see "Live Demo" below for the
+recorded run. The APPROVE half (a passing evaluation followed by `release_payment`) has still not
+been run; that remains marked as unproven rather than filled with an invented value — see
+`docs/limitations.md` and `docs/release-notes.md` "Blockers to v1.0.0."
 
 ## Project Name
 
@@ -87,9 +88,36 @@ and contract layers.
 ## Live Demo
 
 https://workresolve.vercel.app/ — deployed on Vercel, pointed at the deployed contract (see
-"Contract" below). A real, end-to-end two-wallet APPROVE/REJECT lifecycle has not been run against
-it yet; the static `/demo` page walks through the flow with clearly labeled illustrative examples
-in the meantime.
+"Contract" below).
+
+**Recorded live run — milestone #1 on GenLayer Studio (2026-09-11).** Every step below was signed
+by a real wallet against the live contract `0xdD0b1E30D7934845D9B91633bDAD21fBF7A83a2e`, using two
+distinct accounts: client `0x009a88638467af8ca34f775dd3f5c5763e2b97a6` and freelancer
+`0x4d3d7023479bf78a3181aefaec977b71202619ff`. The contract itself enforces that these differ, and
+that `submit_work` is signed by the freelancer, so this is genuinely a two-wallet run.
+
+| Step | Recorded |
+| --- | --- |
+| `create_milestone` (client) | 14:59:01 |
+| `fund_milestone` (client, 20 GEN into escrow) | 14:59:58 |
+| `accept_milestone` (freelancer) | 15:14:07 |
+| `submit_work` (freelancer) | 15:17:48 |
+| `evaluate_and_finalize` — **REJECT** | 15:53:11 |
+| `refund_client` — escrow returned | state `REFUNDED` |
+
+The evaluation step is the one that matters most here: it ran GenLayer's real validator consensus
+over an LLM judgment (the validators on this network run Claude Sonnet, GPT, Gemini, Qwen and Kimi
+under per-validator model policies), returned a REJECT verdict, and the contract then moved the
+escrow on its own — no human approval button anywhere in the path.
+
+Still not run: the **APPROVE** half (a passing evaluation followed by `release_payment`). And note
+that what is proven above is the contract's own state reaching `REFUNDED` with `refunded = True`
+after `_pay_out()` returned without reverting — whether the GEN then credited to the client's wallet
+*balance* on Studio specifically is a separate question, since GenLayer's docs note Studio simulates
+balances without a full EVM layer. See `docs/limitations.md`.
+
+The static `/demo` page still walks through the flow with clearly labeled illustrative examples for
+anyone who wants the narrated version.
 
 ## Repository
 
@@ -112,15 +140,21 @@ a normal deploy success but never actually finished, due to two separate GenVM-l
 file's own header comment (root-caused with `genlayer receipt`/`genlayer trace`, see
 `docs/limitations.md`). This deployment is confirmed live via `genlayer code`, which returns the
 contract's actual source rather than a "code not found" error. See `docs/release-notes.md`
-"Post-launch fixes" and "Blockers to v1.0.0" for the full explanation and remaining status (a real,
-end-to-end two-wallet APPROVE/REJECT lifecycle, and a live-network run of the deterministic
-funded-lifecycle refund tests, both against this new deployment).
+"Post-launch fixes" and "Blockers to v1.0.0" for the full explanation and remaining status.
 
-## Testnet
+## Networks
 
-Network: GenLayer Asimov Testnet (`testnet-asimov`, chain id `4221`) per
-`src/lib/genlayer/config.ts`. The contract above is deployed on this network. A real, two-wallet
-APPROVE flow and REJECT flow against it have not been run yet.
+The app has an in-app network switcher and is deployed on two GenLayer networks, each with its own
+permanent address (a contract on one network does not exist on another):
+
+- **GenLayer Studio Network** (`studionet`, chain id `61999`) — the default.
+  `0xdD0b1E30D7934845D9B91633bDAD21fBF7A83a2e`. This is where the recorded two-wallet REJECT
+  lifecycle above was run.
+- **GenLayer Asimov Testnet** (`testnetAsimov`, chain id `4221`).
+  `0x14255277822815F43DA58271d8d28f0F844cf209`. No full lifecycle has been run here.
+
+Both are upgradeable, so fixes are pushed to these same addresses via
+`scripts/upgrade-contract.mjs` rather than redeployed.
 
 ## Demo Video
 

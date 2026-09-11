@@ -5,9 +5,9 @@
 This is the first version number assigned to WorkResolve. Semantic versioning, GenLayer-testnet
 qualifier:
 
-- **0** (major) — pre-1.0: the product has never had a real, verified live deployment. Bumping to
-  `1.0.0` should wait until a real contract deployment and a real two-wallet APPROVE/REJECT run
-  have actually happened (see "Blockers to v1.0.0" below).
+- **0** (major) — pre-1.0. A real, verified live deployment and a real two-wallet **REJECT** run
+  have now both happened (see "Blockers to v1.0.0" below). Bumping to `1.0.0` waits on the APPROVE
+  half — a passing evaluation followed by `release_payment`.
 - **1** (minor) — the full intended MVP surface exists: Create → Fund → Accept → Submit → Evaluate
   → Consensus → Settle, plus reputation, local history, and notifications (Phases 1-7).
 - **0** (patch) — no post-release patch yet; this is the first tagged state.
@@ -163,10 +163,20 @@ for this release and belongs on the roadmap (see `README.md` "Roadmap"), not in 
    (confirmed transfer mechanism, deadline gating, upgradability — see "Post-launch fixes" above)
    onto the live network. **A third bug (the `gl.hash` issue below) was found after this deployment
   and has since been fixed in place via `upgrade()` — see the entry right after this one.**
-2. A real two-wallet APPROVE flow and REJECT flow, executed and recorded with actual transaction
-   hashes, against the current deployment above. **Still pending** — the contract itself is no longer
-   known-broken (the `gl.hash` bug that blocked `create_milestone` is fixed and confirmed live as of
-   the upgrade transaction below), so this is now unblocked and ready to actually attempt.
+2. A real two-wallet APPROVE flow and REJECT flow, executed and recorded against a live deployment.
+   **REJECT: done (2026-09-11).** Milestone #1 on the Studio deployment
+   (`0xdD0b1E30D7934845D9B91633bDAD21fBF7A83a2e`) ran the complete path with two distinct wallets —
+   client `0x009a8863…b97a6` created and funded it (20 GEN into escrow), freelancer
+   `0x4d3d7023…2619ff` accepted and submitted, `evaluate_and_finalize` ran GenLayer's real validator
+   consensus over an LLM judgment and returned **REJECT**, and the contract moved the escrow itself,
+   ending at state `REFUNDED`. No human approval step anywhere in that path. The contract enforces
+   client ≠ freelancer and that `submit_work` is signed by the freelancer, so the two-wallet property
+   is enforced on-chain rather than merely claimed. See `docs/submission.md` "Live Demo" for the
+   step-by-step timings. **APPROVE: still pending** — a passing evaluation followed by
+   `release_payment` has not been run. Note also that what the REJECT run proves is the contract
+   reaching `REFUNDED` with `refunded = True` after `_pay_out()` returned without reverting; whether
+   the GEN credited to the client's wallet *balance* on Studio is a separate open question, since
+   GenLayer's own docs note Studio simulates balances without a full EVM layer.
 3. ~~A deployed, publicly reachable production frontend pointed at that contract~~ — **done, needs
    re-pointing to the new address.** Live at https://workresolve.vercel.app/, deployed on Vercel.
    `NEXT_PUBLIC_WORKRESOLVE_CONTRACT_ADDRESS` needs updating to

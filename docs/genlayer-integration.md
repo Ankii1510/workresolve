@@ -129,6 +129,9 @@ centralized or absent.
   its result).
 - **Evaluation flow**: fully documented end to end in `docs/evaluation.md`, including the exact
   prompt structure, the evaluator input schema, and the consensus visualization shown in the UI.
-- **Transaction/reference examples**: the deployment transaction above is the first real one. A
-  real APPROVE and a real REJECT milestone lifecycle (two wallets, real testnet GEN, real
-  transaction hashes) are the next step — see `docs/demo.md`.
+- **Transaction/reference examples**: a complete **REJECT** milestone lifecycle has been run on the
+  live Studio deployment (`0xdD0b1E30D7934845D9B91633bDAD21fBF7A83a2e`) with two distinct wallets —
+  create → fund → accept → submit → `evaluate_and_finalize` (real validator consensus over an LLM
+  judgment, verdict REJECT) → refund, ending at state `REFUNDED`. See `docs/submission.md`
+  "Live Demo" for the recorded step-by-step run. The **APPROVE** path (passing evaluation followed
+  by `release_payment`) is the remaining one — see `docs/demo.md`.

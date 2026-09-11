@@ -7,9 +7,12 @@ Intelligent Contracts and decentralized validator consensus — instead of a sin
 > **Status: v0.1.0-testnet.** The contract is deployed and live on **two** GenLayer networks — the
 > hosted Studio network (the app's default) and the Asimov Testnet — and the frontend is publicly
 > live at https://workresolve.vercel.app/ with an in-app network switcher. See "Networks" below for
-> both addresses. A milestone has been created and funded on Studio against the live contract; the
-> APPROVE/REJECT half of the lifecycle has not been completed end to end yet — see "Limitations"
-> below for exactly what that means. See `docs/release-notes.md` for the full version history.
+> both addresses. A complete **two-wallet REJECT lifecycle** has been run end to end against the
+> live Studio contract — create → fund → accept → submit → AI evaluation under real validator
+> consensus → refund — with the escrow moved by the contract itself and no human approval step in
+> the path; see `docs/submission.md` "Live Demo" for the recorded run. The APPROVE half
+> (`release_payment`) has not been run yet — see "Limitations". Full history in
+> `docs/release-notes.md`.
 
 ## Problem
 
@@ -243,12 +246,13 @@ formally, independently audited** — see `SECURITY.md` "Audit status."
 
 ## Limitations
 
-Full, current, honest list: [`docs/limitations.md`](./docs/limitations.md). Headline items: no live
-deployment exists yet (no reachable Docker daemon or GenLayer testnet network egress in this
-project's build environment); GenLayer's AI evaluation is probabilistic, not a legal judgment;
-submitted evidence can disappear or change after submission; transaction/activity history is a
-local, per-browser log, not a full cross-device ledger; no dispute or appeals mechanism exists
-beyond the evaluation itself; testnet only, never mainnet.
+Full, current, honest list: [`docs/limitations.md`](./docs/limitations.md). Headline items: the
+APPROVE path (`release_payment`) has not been run end to end yet — only the REJECT/refund path has;
+whether a refund's GEN credits to a wallet *balance* on Studio specifically is unconfirmed, since
+GenLayer's docs note Studio simulates balances without a full EVM layer; GenLayer's AI evaluation is
+probabilistic, not a legal judgment; submitted evidence can disappear or change after submission;
+transaction/activity history is a local, per-browser log, not a full cross-device ledger; no dispute
+or appeals mechanism exists beyond the evaluation itself; testnet only, never mainnet.
 
 ## Roadmap
 
