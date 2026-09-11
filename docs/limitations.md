@@ -129,6 +129,74 @@ stands today are listed — nothing here is a generic disclaimer.
   layout and accessibility semantics (labels, focus order, keyboard traps) were reviewed at the
   code level; no real device lab or screen reader session confirmed the result.
 
+### Deploying to the wrong network is silent, and every symptom points somewhere else (2026-09-09/10)
+
+The most expensive misdiagnosis in this project, recorded in full because almost every instinct it
+provoked was wrong.
+
+`NEXT_PUBLIC_WORKRESOLVE_CONTRACT_ADDRESS_STUDIONET` was set to
+`0x941F3904D19b39113d82AA3dC8942966b33fCB64` — a contract that had in fact been deployed to
+**Asimov**, because the terminal that ran `genlayer deploy` still had `genlayer network set
+testnet-asimov` active. (An earlier `genlayer network set studionet` had been run in a *different*
+shell — a sandboxed VM with its own genlayer config and its own keystore, which is why its
+`account list` showed a different deployer address entirely. Two shells, two configs; only one of
+them was ever pointed at Studio.) With the app's network switcher on Studio, every write asked
+Studio's consensus contract (`0xb7278A61…`) to call a contract that exists only on Asimov, and
+Studio replied exactly as it should: `{ code: -32001, message: "Contract not found", data: {
+address: "0x941F3904…" } }`.
+
+Why it took a day:
+
+- **Reads kept working.** `genlayer code <address>` succeeded throughout — from the same terminal,
+  which was on Asimov, so it was reading the contract from the network it was actually on. A
+  working read was taken as proof the contract was live "on Studio". It never was.
+- **The wallet erased the reason.** OKX re-wrapped the node's reply as `{ code: -32603, message:
+  "Transaction failed", data: { originalError: {} } }` — the real message emptied out — which
+  reached the UI as "An internal error was received." Expanding `originalError` in the console
+  showed `{}`. The reason only became visible after retrying the same transaction through a
+  different, ethers-based wallet, which passed the node's error through verbatim.
+- **A deploy receipt looks the same at a glance on either network.** It is not: genlayer-js returns
+  a *simulator-shaped* transaction for Studio chains (`consensus_data.leader_receipt`, snake_case)
+  and a *consensus-contract-shaped* one for real chains (`txCalldata`, `txDataDecoded`,
+  `readStateBlockRange`, `lastRound`, `consumedValidators`, `activator`, `lastLeader`). The deploy
+  receipt was the latter — and carried block numbers around 21,151,360, which no freshly-started
+  simulator has. Both facts were in the receipt from the first minute.
+- **Plausible-sounding platform theories filled the gap.** Studio resetting nightly, missing "ghost
+  contracts", the deprecated `initializeConsensusSmartContract()`, OKX incompatibility, per-account
+  contract scoping — each was investigated and none was the cause. The observation that finally
+  broke it was the user's: another app (BrickProof) was working on Studio at the same moment, so
+  Studio could not be broadly broken.
+
+What is now in place so this class of mistake announces itself:
+
+- `isContractNotFoundError` / `extractNotFoundAddress` in `src/lib/genlayer/errors.ts` classify this
+  reply, name the address, name the currently-selected network, and say plainly that an address from
+  a different GenLayer network is the most common cause. It is ordered *ahead* of the broader
+  `isResourceNotFoundError`, whose "the network hasn't caught up with your deployment yet" wording is
+  wrong here and actively sends the reader in the wrong direction. Regression tests in
+  `src/tests/unit/errors.test.ts` pin all of it, including the ethers-wrapped and nested-wallet
+  shapes.
+- **A wallet that discards the node's reason entirely cannot be classified**, and nothing in this app
+  can recover it. That is an accepted limit. When a wallet error says nothing useful, retry the same
+  transaction through a second wallet before theorising about the network.
+
+Two operational rules follow. Verify the active network *in the same shell* immediately before
+deploying (`genlayer config get`), and verify a fresh deployment on that network's **own** explorer
+(`explorer-studio.genlayer.com` vs `explorer-asimov.genlayer.com`) — an address that resolves on one
+and 404s on the other settles the question in seconds, which is the check that was missing here.
+
+**Note on what upgradability does and does not solve here.** This contract has been upgradeable since
+Phase 8 (`root.upgraders` in `__init__`, the `upgrade()` method, `get_upgraders()`), and
+`scripts/upgrade-contract.mjs` is the tool that drives it — already used successfully once, to ship
+the `gl.hash` fix to the live Asimov contract without a redeployment. That is what keeps ONE address
+stable across code changes: after a network's first deployment, no address on it ever has to be
+re-issued, re-documented, or re-entered into Vercel again. It does **not** help with the incident
+above, and cannot: a contract on Asimov and a contract on Studio are separate contracts at separate
+addresses on unrelated chains, so every network needs its own first deployment, and each keeps its
+own permanent address from then on. `scripts/upgrade-contract.mjs` originally hardcoded
+`testnetAsimov`, which quietly limited upgrades to one network; it now takes the network as a
+required first argument and echoes the resolved chain name, id and RPC before signing anything.
+
 ## Product design (intentional, not bugs)
 
 - **AI evaluation is probabilistic, not a deterministic legal judgment.** GenLayer's validator

@@ -96,3 +96,62 @@ describe("toAppError", () => {
     expect(result.message).toMatch(/not.{0,20}problem with anything you entered|not.{0,10}app-side/i);
   });
 });
+
+describe('GenLayer\'s "Contract not found" (wrong network\'s address)', () => {
+  // The real incident these pin: WorkResolve's Studio address env var held
+  // 0x941F3904…, a contract that had actually been deployed to ASIMOV (the
+  // deploying terminal's CLI was still on testnet-asimov). Every write with
+  // the switcher on Studio therefore asked Studio's consensus contract for a
+  // contract that only exists on Asimov. See isContractNotFoundError's
+  // docstring in lib/genlayer/errors.ts for the full writeup.
+  const ADDRESS = "0x941F3904D19b39113d82AA3dC8942966b33fCB64";
+
+  it("classifies the node's structured -32001 reply and names the missing address", () => {
+    const result = toAppError({
+      code: -32001,
+      message: "Contract not found",
+      data: { address: ADDRESS },
+    });
+    expect(result.code).toBe("GENLAYER_UNAVAILABLE");
+    expect(result.message).toContain(ADDRESS);
+    expect(result.message).toMatch(/different.{0,20}GenLayer network/i);
+  });
+
+  it("finds the reason inside an ethers-style wrapper that stringifies the node's JSON into its own message", () => {
+    // Verbatim shape from the wallet that did surface the real reason.
+    const result = toAppError(
+      new Error(
+        `could not coalesce error (error={ "code": -32001, "data": { "address": "${ADDRESS}" }, ` +
+          `"message": "Contract not found" }, payload={ "id": 8, "jsonrpc": "2.0", ` +
+          `"method": "eth_sendRawTransaction", "params": [ "0xf901c9..." ] }, ` +
+          `code=UNKNOWN_ERROR, version=6.14.0)`,
+      ),
+    );
+    expect(result.code).toBe("GENLAYER_UNAVAILABLE");
+    expect(result.message).toContain(ADDRESS);
+  });
+
+  it("still classifies the error when the wallet nests it and gives no address", () => {
+    const result = toAppError({
+      code: -32603,
+      message: "Transaction failed",
+      data: { originalError: { message: "Contract not found" } },
+    });
+    expect(result.code).toBe("GENLAYER_UNAVAILABLE");
+    expect(result.message).toContain("the configured address");
+    expect(result.message).toMatch(/different.{0,20}GenLayer network/i);
+  });
+
+  it("takes precedence over the generic -32001 'deployment hasn't caught up' message, which is wrong for this case", () => {
+    const result = toAppError({ code: -32001, message: "Contract not found", data: { address: ADDRESS } });
+    expect(result.message).not.toMatch(/hasn't caught up/i);
+    expect(result.message).not.toMatch(/deployment itself never finished/i);
+  });
+
+  it("does not hang or throw on a self-referencing error object", () => {
+    const cyclic: Record<string, unknown> = { message: "Contract not found" };
+    cyclic.cause = cyclic;
+    expect(() => toAppError(cyclic)).not.toThrow();
+    expect(toAppError(cyclic).code).toBe("GENLAYER_UNAVAILABLE");
+  });
+});

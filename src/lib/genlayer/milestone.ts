@@ -129,6 +129,56 @@ export function canAcceptMilestone(
   );
 }
 
+/**
+ * Whether a submission can exist on-chain for this milestone yet.
+ *
+ * `submit_work` is what writes `self.submissions[milestone_id]` and moves the
+ * milestone to SUBMITTED, so every state from SUBMITTED onward has one and no
+ * earlier state does. CANCELLED is deliberately excluded: `cancel_milestone`
+ * only accepts CREATED/FUNDED/ACCEPTED, so a cancelled milestone never had a
+ * submission.
+ *
+ * REAL BUG THIS FIXES (Studio, 2026-09-11): the detail page called
+ * `get_submission` unconditionally. On a perfectly healthy FUNDED milestone
+ * the contract raised `ValueError("No submission exists yet for milestone 1.")`
+ * — the correct answer to a question that should not have been asked — and the
+ * page rendered a red "Missing or invalid parameters. / Try again" box next to
+ * an escrow that had just been funded successfully. Worse, that Python message
+ * never even reached the browser: the console showed only
+ * `GenLayer RPC error (gen_call): execution failed`, so no amount of
+ * message-matching in the catch block could have recovered the meaning. The
+ * milestone's own state answers it locally, for free, and cannot be reworded
+ * by a future genlayer-js or viem release.
+ */
+export function canHaveSubmission(milestone: Pick<Milestone, "state">): boolean {
+  return (
+    milestone.state === "SUBMITTED" ||
+    milestone.state === "EVALUATING" ||
+    milestone.state === "APPROVED" ||
+    milestone.state === "REJECTED" ||
+    milestone.state === "RELEASED" ||
+    milestone.state === "REFUNDED"
+  );
+}
+
+/**
+ * Whether an evaluation can exist on-chain for this milestone yet.
+ *
+ * `evaluate_and_finalize` writes `self.evaluations[milestone_id]` and then
+ * immediately sets APPROVED or REJECTED, so EVALUATING — which it sets on the
+ * way in, before the non-deterministic block runs — is NOT included: a
+ * milestone sitting in EVALUATING has no evaluation stored yet. RELEASED and
+ * REFUNDED are, since both can only be reached from a finalized result.
+ */
+export function canHaveEvaluation(milestone: Pick<Milestone, "state">): boolean {
+  return (
+    milestone.state === "APPROVED" ||
+    milestone.state === "REJECTED" ||
+    milestone.state === "RELEASED" ||
+    milestone.state === "REFUNDED"
+  );
+}
+
 /** evaluate_and_finalize is permissionless by contract design (see its
  * docstring in contracts/workresolve.py) — any connected wallet may trigger
  * it once the milestone is SUBMITTED. This only gates on milestone state,

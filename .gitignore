@@ -36,6 +36,14 @@ yarn-error.log*
 .env*
 !.env.example
 
+# Encrypted account keystores (`genlayer account export --output …`). These are
+# what scripts/deploy-contract.mjs and scripts/upgrade-contract.mjs decrypt to
+# sign with, and the account inside is the SOLE UPGRADER of every contract it
+# deployed — on every network. An encrypted keystore is only as safe as its
+# password, so it is never committed, not even to a private repo.
+*keystore*.json
+upgrader-keystore.json
+
 # secrets / keys — belt-and-braces, in case anything gets dropped here locally
 *.key
 *.pem

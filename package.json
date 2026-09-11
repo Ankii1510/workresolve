@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "deploy-contract": "node scripts/deploy-contract.mjs",
     "upgrade-contract": "node scripts/upgrade-contract.mjs"
   },
   "dependencies": {

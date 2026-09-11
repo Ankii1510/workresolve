@@ -8,6 +8,8 @@ import {
   canReleasePayment,
   canRefundClient,
   canTriggerEvaluation,
+  canHaveEvaluation,
+  canHaveSubmission,
   evaluateAndFinalize,
   formatGenAmount,
   getEvaluation,
@@ -53,13 +55,20 @@ export function EvaluationView({ milestoneId }: { milestoneId: string }) {
     () => getMilestone(wallet.readClient, milestoneId),
     [wallet.readClient, milestoneId],
   );
+  // Both reads are gated on the milestone's own state: asking for a
+  // submission or an evaluation that provably cannot exist yet returns a
+  // contract revert, which the UI then has to render as *something* — and on
+  // 2026-09-11 that something was a red error box on a healthy milestone. See
+  // canHaveSubmission()/canHaveEvaluation() in lib/genlayer/milestone.ts.
   const submission = useContractRead(
     () => getSubmission(wallet.readClient, milestoneId),
     [wallet.readClient, milestoneId],
+    { enabled: !!milestone.data && canHaveSubmission(milestone.data) },
   );
   const evaluation = useContractRead(
     () => getEvaluation(wallet.readClient, milestoneId),
     [wallet.readClient, milestoneId],
+    { enabled: !!milestone.data && canHaveEvaluation(milestone.data) },
   );
 
   const evalTx = useTransaction("evaluateAndFinalize");

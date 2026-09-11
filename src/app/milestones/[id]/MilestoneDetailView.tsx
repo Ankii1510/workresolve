@@ -8,6 +8,7 @@ import { useTransaction } from "@/hooks/useTransaction";
 import {
   acceptMilestone,
   canAcceptMilestone,
+  canHaveSubmission,
   formatGenAmount,
   fundMilestone,
   getMilestone,
@@ -68,9 +69,14 @@ export function MilestoneDetailView({ milestoneId }: { milestoneId: string }) {
     () => getMilestone(wallet.readClient, milestoneId),
     [wallet.readClient, milestoneId],
   );
+  // Only ask the chain for a submission once the milestone's state says one
+  // can exist — see canHaveSubmission()'s docstring for the live bug this
+  // fixes (a FUNDED milestone rendered a red error box for the contract's
+  // entirely correct "no submission yet").
   const submission = useContractRead(
     () => getSubmission(wallet.readClient, milestoneId),
     [wallet.readClient, milestoneId],
+    { enabled: !!milestone.data && canHaveSubmission(milestone.data) },
   );
 
   const toast = useToast();

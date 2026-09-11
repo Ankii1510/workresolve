@@ -15,6 +15,7 @@
  * than a made-up generic one, so a real revert is never silently hidden.
  */
 import type { AppError } from "@/types";
+import { getGenLayerConfig } from "@/lib/genlayer/config";
 
 /** Thrown by lib/genlayer/transactions.ts's sendWriteTransaction when a
  * finalized transaction's execution failed (txExecutionResultName ===
@@ -64,6 +65,99 @@ export function isResourceNotFoundError(error: unknown): boolean {
   }
   const message = extractMessage(error) ?? "";
   return /requested resource not found/i.test(message);
+}
+
+/**
+ * GenLayer's node saying, at transaction-submission time, that the contract
+ * a write is addressed to does not exist ON THAT NETWORK at all.
+ *
+ * REAL, CONFIRMED BUG THIS EXISTS FOR (2026-09-09/10) — the single most
+ * expensive misdiagnosis in this project so far, so the full story is here
+ * to stop the next one:
+ *
+ * WorkResolve's Studio address env var was set to
+ * `0x941F3904D19b39113d82AA3dC8942966b33fCB64`, a contract that had been
+ * deployed while the deploying terminal's genlayer-cli was still pointed at
+ * `testnet-asimov` — so it lives on ASIMOV, not Studio. With the app's
+ * network switcher on Studio, every write was therefore asking *Studio's*
+ * consensus contract (0xb7278A61…) to call a contract that only exists on
+ * Asimov. GenLayer's Studio node replied, precisely and correctly:
+ *
+ *     { code: -32001, message: "Contract not found",
+ *       data: { address: "0x941F3904…" } }
+ *
+ * Two things made this take a day to find. First, reads kept working:
+ * `genlayer code <address>` succeeded the whole time — because that CLI was
+ * *also* on Asimov, so it was reading the contract from the network the
+ * contract was actually on. Second, the wallet swallowed the message: OKX
+ * re-wrapped the node's reply as an opaque `{ code: -32603, message:
+ * "Transaction failed", data: { originalError: {} } }` with the real reason
+ * emptied out, which surfaced in the UI as "An internal error was received."
+ * It only became legible when the same transaction was retried through a
+ * different (ethers-based) wallet, which passed the node's original error
+ * through verbatim.
+ *
+ * So this matcher deliberately searches the WHOLE error object graph, not
+ * just its top-level `message`: the useful text is routinely buried under
+ * `details` / `cause` / `data` / `originalError`, or embedded inside a
+ * larger string (ethers stringifies the node's JSON into its own message).
+ * A wallet that erases the reason entirely — as OKX did — still cannot be
+ * classified here; nothing in this app can recover information the wallet
+ * threw away. That is a real, accepted limit, not an oversight.
+ */
+const CONTRACT_NOT_FOUND_PATTERN = /contract\s+(?:0x[a-fA-F0-9]{40}\s+)?not\s+found/i;
+
+/** Walks an arbitrary thrown value's object graph, collecting every string
+ * it finds under the keys errors actually nest useful text in. Depth- and
+ * breadth-bounded, and cycle-safe, because this runs inside a catch block
+ * and must never itself throw or hang. */
+function collectErrorStrings(error: unknown, depth = 0, seen = new Set<unknown>()): string[] {
+  if (depth > 4 || error == null) return [];
+  if (typeof error === "string") return [error];
+  if (typeof error !== "object") return [];
+  if (seen.has(error)) return [];
+  seen.add(error);
+
+  const out: string[] = [];
+  const record = error as Record<string, unknown>;
+  for (const key of ["message", "shortMessage", "details", "reason", "cause", "data", "originalError", "error", "info", "body"]) {
+    if (key in record) out.push(...collectErrorStrings(record[key], depth + 1, seen));
+  }
+  return out;
+}
+
+export function isContractNotFoundError(error: unknown): boolean {
+  return collectErrorStrings(error).some((s) => CONTRACT_NOT_FOUND_PATTERN.test(s));
+}
+
+/** The contract address GenLayer named as missing, when it gave one — either
+ * as a structured `data.address` or inline in the message text. Used only to
+ * make the message concrete; absence of it must never suppress the error. */
+export function extractNotFoundAddress(error: unknown): string | null {
+  const direct = findAddressField(error);
+  if (direct) return direct;
+  for (const s of collectErrorStrings(error)) {
+    const match = s.match(/contract\s+(0x[a-fA-F0-9]{40})\s+not\s+found/i) ?? s.match(/"address"\s*:\s*"(0x[a-fA-F0-9]{40})"/i);
+    if (match) return match[1];
+  }
+  return null;
+}
+
+function findAddressField(error: unknown, depth = 0, seen = new Set<unknown>()): string | null {
+  if (depth > 4 || error == null || typeof error !== "object") return null;
+  if (seen.has(error)) return null;
+  seen.add(error);
+
+  const record = error as Record<string, unknown>;
+  const address = record.address;
+  if (typeof address === "string" && /^0x[a-fA-F0-9]{40}$/.test(address)) return address;
+  for (const key of ["data", "cause", "originalError", "error", "info"]) {
+    if (key in record) {
+      const found = findAddressField(record[key], depth + 1, seen);
+      if (found) return found;
+    }
+  }
+  return null;
 }
 
 /** GenLayer's node itself failing to resolve a contract's current state
@@ -169,6 +263,20 @@ function extractMessage(error: unknown): string | null {
   return null;
 }
 
+/** Names the network the app is currently pointed at, for the
+ * contract-not-found message above — that pairing (this address, on THIS
+ * network) is the whole diagnosis, so it is worth reaching into config for.
+ * Guarded because config throws on a malformed NEXT_PUBLIC_GENLAYER_NETWORK,
+ * and an error-classifier that can itself throw is worse than a vague
+ * message. */
+function describeActiveNetwork(): string {
+  try {
+    return getGenLayerConfig().chain.name;
+  } catch {
+    return "the selected GenLayer network";
+  }
+}
+
 /**
  * Classifies a raw error thrown from a GenLayer client call (readContract,
  * writeContract, waitForTransactionReceipt, or the injected wallet
@@ -208,6 +316,25 @@ export function classifyBlockchainError(error: unknown): AppError | null {
     return {
       code: "RPC_ERROR",
       message: "Couldn't reach the GenLayer network. Check your connection and try again.",
+      cause: error,
+    };
+  }
+  // MUST stay ahead of isResourceNotFoundError: GenLayer sends "Contract not
+  // found" with code -32001, which that broader check also matches, but its
+  // message ("the network hasn't caught up with your deployment yet") is
+  // actively wrong here and sent a day of debugging in the wrong direction.
+  // See isContractNotFoundError's docstring for the incident.
+  if (isContractNotFoundError(error)) {
+    const address = extractNotFoundAddress(error);
+    return {
+      code: "GENLAYER_UNAVAILABLE",
+      message:
+        `GenLayer says there is no contract at ${address ?? "the configured address"} on ` +
+        `${describeActiveNetwork()}. The most common cause is an address from a *different* ` +
+        "GenLayer network: a contract deployed on Asimov does not exist on Studio, and vice versa. " +
+        "Check which network is selected against the address configured for it " +
+        "(NEXT_PUBLIC_WORKRESOLVE_CONTRACT_ADDRESS_* — see .env.example), and confirm the address " +
+        "on that network's own explorer before assuming the network is at fault.",
       cause: error,
     };
   }

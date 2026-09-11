@@ -52,8 +52,17 @@
  * USAGE (every time you need to push a contract fix without a new address):
  *   npm run upgrade-contract -- <contractAddress> <path-to-fixed-.py-file> <path-to-keystore.json>
  *
- * Example, for the current live contract:
- *   npm run upgrade-contract -- 0x14255277822815F43DA58271d8d28f0F844cf209 contracts/workresolve.py upgrader-keystore.json
+ * Example, for the current live Asimov contract:
+ *   npm run upgrade-contract -- testnetAsimov 0x14255277822815F43DA58271d8d28f0F844cf209 contracts/workresolve.py upgrader-keystore.json
+ *
+ * And for a Studio deployment (its own, different address):
+ *   npm run upgrade-contract -- studionet <studio-address> contracts/workresolve.py upgrader-keystore.json
+ *
+ * THIS IS THE NORMAL WAY TO SHIP A CONTRACT CHANGE. `genlayer deploy` is only
+ * for standing a contract up on a network for the FIRST time; after that, each
+ * network keeps one permanent address and every code change goes through this
+ * script, so no address ever has to be re-issued, re-documented, or re-entered
+ * into Vercel again.
  *
  * It will prompt for the keystore password, then print the upgrade
  * transaction's hash — verify it the same way as every deployment this
@@ -66,16 +75,39 @@ import { readFileSync } from "node:fs";
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 import { createClient, createAccount } from "genlayer-js";
-import { testnetAsimov } from "genlayer-js/chains";
+import { localnet, studionet, testnetAsimov, testnetBradbury } from "genlayer-js/chains";
 import { Wallet } from "ethers";
 
-async function main() {
-  const [, , contractAddress, contractFilePath, keystorePath] = process.argv;
+/**
+ * Every network this contract can live on. A contract deployed on Asimov and
+ * one deployed on Studio are different contracts at different addresses on
+ * unrelated chains — upgradability keeps ONE address stable across code
+ * changes on ONE network, it can never make a single address serve two. So
+ * each network has its own permanent address, and this script is pointed at
+ * one of them per run.
+ *
+ * The network used to be hardcoded to testnetAsimov here, which silently
+ * limited this tool to a single network — and sending an upgrade to the wrong
+ * network is exactly the class of mistake that cost a day on 2026-09-09 (see
+ * docs/limitations.md). Hence: required argument, no default, and the target
+ * chain is echoed back before anything is signed.
+ */
+const CHAINS = { localnet, studionet, testnetAsimov, testnetBradbury };
 
-  if (!contractAddress || !contractFilePath || !keystorePath) {
+async function main() {
+  const [, , network, contractAddress, contractFilePath, keystorePath] = process.argv;
+
+  if (!network || !contractAddress || !contractFilePath || !keystorePath) {
     console.error(
-      "Usage: node scripts/upgrade-contract.mjs <contractAddress> <path-to-.py-file> <path-to-keystore.json>",
+      "Usage: node scripts/upgrade-contract.mjs <network> <contractAddress> <path-to-.py-file> <path-to-keystore.json>",
     );
+    console.error(`  <network> is one of: ${Object.keys(CHAINS).join(", ")}`);
+    process.exit(1);
+  }
+
+  const chain = CHAINS[network];
+  if (!chain) {
+    console.error(`Unknown network "${network}". Expected one of: ${Object.keys(CHAINS).join(", ")}`);
     process.exit(1);
   }
 
@@ -89,8 +121,14 @@ async function main() {
 
   const account = createAccount(privateKey);
   console.log(`Signing as ${account.address} — confirm this matches your deployer/upgrader address on-chain.`);
+  console.log(`Target network: ${chain.name} (chain id ${chain.id}, rpc ${chain.rpcUrls.default.http[0]})`);
+  console.log(`Target contract: ${contractAddress}`);
+  console.log(
+    `Confirm ${contractAddress} exists on ${chain.name} before continuing — an address from a different ` +
+      "GenLayer network will fail with \"Contract not found\" (see docs/limitations.md).",
+  );
 
-  const client = createClient({ chain: testnetAsimov, account });
+  const client = createClient({ chain, account });
 
   const newCode = readFileSync(contractFilePath);
   console.log(`Read ${newCode.length} bytes from ${contractFilePath}. Sending upgrade transaction...`);
