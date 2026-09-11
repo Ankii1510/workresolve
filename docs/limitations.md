@@ -107,21 +107,44 @@ stands today are listed — nothing here is a generic disclaimer.
   above). Regression tests in `src/tests/unit/errors.test.ts`.
 - **This development sandbox still has no `genlayer.com` network egress and no reachable Docker
   daemon**, so deployment, `genlayer trace`/`genlayer receipt` calls, and any other live-network
-  command must run from a machine with real access, not from this sandbox. As of the fourth (now
-  live) deployment above, no milestone lifecycle (fund → accept → submit → evaluate → settle) has
-  yet been run against it, so `evaluate_and_finalize`'s real `gl.exec_prompt`/`gl.get_webpage` calls
-  and real validator consensus remain unexercised in practice — every claim about contract
-  correctness, evaluation behavior, and escrow accounting is still verified only at the deterministic
-  pure-Python logic level (94/94 tests in `contracts/tests_logic`), not a full live run, until a real
-  lifecycle is exercised against this deployment.
-- **The outbound transfer mechanism matches GenLayer's documented API on paper, but still needs a
-  live-network run to confirm end to end** — no longer blocked on deployment (see above), just not
-  yet exercised. A GenLayer reviewer flagged the earlier `gl.ContractAt(...).emit_transfer(...)` call
-  as not a real API; it has been replaced with `_pay_out()` /
-  `_ExternalRecipient(...).emit_transfer(value=...)`, matching GenLayer's own "Value Transfers"
-  documentation. This is the single highest-priority item to verify next against the live
-  deployment, via `contracts/tests/test_workresolve.py::TestCancelMilestone`'s two deterministic
-  (no-LLM) refund tests — see `docs/contracts.md` "Known Limitations."
+  command must run from a machine with real access, not from this sandbox.
+
+  **This no longer means the lifecycle is unexercised.** On 2026-09-11 a complete two-wallet REJECT
+  lifecycle was run **manually, through the deployed frontend**, against the Studio deployment
+  (`0xdD0b1E30D7934845D9B91633bDAD21fBF7A83a2e`): create → fund (20 GEN into escrow) → accept →
+  submit → `evaluate_and_finalize` → refund, ending at state `REFUNDED`. That run genuinely
+  exercised `gl.nondet.web.render` / `gl.nondet.exec_prompt` inside
+  `gl.eq_principle.prompt_comparative` and real validator consensus (the verdict was REJECT), and
+  the contract moved the escrow itself. See `docs/submission.md` "Live Demo" for the step-by-step
+  record.
+
+  Three honest qualifications on that:
+  - It was **manual**, through the UI — not a recorded run of the `gltest` suite in
+    `contracts/tests/`, which has still never been executed anywhere (that file says so itself).
+  - It was on **Studio**, not Asimov. No end-to-end lifecycle has been recorded on the public
+    Asimov testnet.
+  - It covered **REJECT/refund only**. The APPROVE path (`release_payment`) has not been run.
+
+  Outside that one run, every claim about contract correctness, evaluation behavior, and escrow
+  accounting is still verified at the deterministic pure-Python logic level (94/94 tests in
+  `contracts/tests_logic`) rather than by repeated live runs.
+- **The outbound transfer mechanism has now run on a live network once, on the refund path — but
+  whether the GEN reached the recipient's wallet balance is still unconfirmed.** A GenLayer reviewer
+  flagged the earlier `gl.ContractAt(...).emit_transfer(...)` call as not a real API; it was replaced
+  with `_pay_out()` / `_ExternalRecipient(...).emit_transfer(value=...)`, matching GenLayer's own
+  "Value Transfers" documentation. In the 2026-09-11 Studio run that code path executed for real:
+  `refund_client` completed, `_pay_out()` returned without reverting, and the milestone reached
+  `REFUNDED` with `refunded = True`.
+
+  What that does **not** prove is the last hop — that the client's wallet *balance* actually
+  increased. GenLayer's own documentation notes that Studio simulates balances and has no full EVM
+  layer or ghost contracts, and BrickProof (an independent GenLayer project) documented a case where
+  a transfer's child transaction finalized with `value_credited: false`. So on Studio specifically,
+  "the contract says it paid out" and "the wallet received it" are separate claims, and only the
+  first is evidenced here. Confirming the second means either checking the recipient's balance
+  before/after, or reading the payout's child transaction for `value_credited` — and ideally doing it
+  on Asimov, which has the real EVM layer. `release_payment` (the APPROVE side of the same mechanism)
+  has not run at all yet.
 - **Wallet and browser edge cases (locked wallet, mid-session account/network switch, browser
   refresh during a pending transaction) were verified by code review, not live manual testing.** No
   browser automation was used in any phase of this project.

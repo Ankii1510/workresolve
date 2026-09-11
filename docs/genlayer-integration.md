@@ -31,8 +31,8 @@ PASS/FAIL/PARTIAL/UNVERIFIABLE verdict per requirement.
   frontend-supplied value, so the criteria being judged can't be swapped out after the fact (see
   `docs/contracts.md` "Requirement Immutability").
 - **External evidence evaluation**: inside a non-deterministic closure, the contract calls
-  `gl.get_webpage(url)` for the submitted deployed URL/repository/evidence links and passes the
-  fetched content to `gl.exec_prompt(...)`/`gl.eq_principle_prompt_comparative(...)` alongside the
+  `gl.nondet.web.render(url)` for the submitted deployed URL/repository/evidence links and passes the
+  fetched content to `gl.nondet.exec_prompt(...)`/`gl.eq_principle.prompt_comparative(...)` alongside the
   requirements, under an explicit three-tier prompt hierarchy (system rules → immutable
   requirements → untrusted fetched content) — see `docs/evaluation.md` "Prompt Injection Defense."
   Every submitted URL and every fetched page is treated as untrusted input to be *assessed*, never
@@ -124,8 +124,8 @@ centralized or absent.
     since this deployment's `__init__` actually ran), this should be the last time a fix requires a
     new address — future fixes can go through the contract's own `upgrade()` method instead.
 - **Relevant contract methods**: `evaluate_and_finalize` (the one GenLayer-dependent method —
-  `contracts/workresolve.py`, search for `gl.get_webpage`/`gl.exec_prompt`/
-  `gl.eq_principle_prompt_comparative`); `compute_score`/`decide` (the deterministic consumers of
+  `contracts/workresolve.py`, search for `gl.nondet.web.render`/`gl.nondet.exec_prompt`/
+  `gl.eq_principle.prompt_comparative`); `compute_score`/`decide` (the deterministic consumers of
   its result).
 - **Evaluation flow**: fully documented end to end in `docs/evaluation.md`, including the exact
   prompt structure, the evaluator input schema, and the consensus visualization shown in the UI.

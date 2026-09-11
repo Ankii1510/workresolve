@@ -660,11 +660,11 @@ class WorkResolve(gl.Contract):
              storage rule that non-deterministic code cannot access
              storage directly).
           2. Run the evaluation prompt inside a closure passed to
-             gl.eq_principle_prompt_comparative — the current SDK's
+             gl.eq_principle.prompt_comparative — the current SDK's
              purpose-built mechanism for validator consensus over
              LLM-derived text (see docs/architecture.md's Phase 4
              correction: this replaces the Phase 2 plan of forcing
-             gl.eq_principle_strict_eq over a canonicalized JSON blob,
+             gl.eq_principle.strict_eq over a canonicalized JSON blob,
              which is far more brittle for free-text LLM output).
           3. Validate the returned JSON strictly (_validate_evaluation_payload).
              A validator whose closure raises breaks consensus for that

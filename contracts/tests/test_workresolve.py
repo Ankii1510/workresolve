@@ -34,7 +34,7 @@ release_payment, refund_client, and cancel_milestone's refund path — but
 they are not equally deterministic to run:
   - release_payment / refund_client (TestEvaluateAndSettle) can only be
     reached through evaluate_and_finalize(), which genuinely calls a live
-    LLM through gl.eq_principle_prompt_comparative. These tests use an
+    LLM through gl.eq_principle.prompt_comparative. These tests use an
     almost-certain-to-pass setup (a trivially reachable page at
     threshold=1 for APPROVE; a 404 URL at threshold=100 for REJECT) but
     `pytest.skip()` on the rare run where the live evaluator disagrees —
@@ -314,8 +314,8 @@ class TestSubmitWork:
 # ---------------------------------------------------------------------------
 # Evaluation + settlement
 #
-# NOTE: evaluate_and_finalize() calls gl.get_webpage / gl.exec_prompt inside
-# a gl.eq_principle_prompt_comparative closure — it genuinely needs a live
+# NOTE: evaluate_and_finalize() calls gl.nondet.web.render / gl.nondet.exec_prompt inside
+# a gl.eq_principle.prompt_comparative closure — it genuinely needs a live
 # LLM-backed validator set to run meaningfully. These tests point it at
 # stable, real, publicly reachable URLs (example.com) precisely so an actual
 # run against a live network exercises the real non-deterministic path

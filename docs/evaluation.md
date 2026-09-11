@@ -130,15 +130,15 @@ Prompt Design".
 
 `evaluate_and_finalize` snapshots the milestone's immutable requirements and
 the submission's evidence into plain values, then runs a closure through
-`gl.eq_principle_prompt_comparative` (GenLayer's mechanism for validator
+`gl.eq_principle.prompt_comparative` (GenLayer's mechanism for validator
 consensus over LLM-derived text). Inside that closure:
 
-1. `gl.get_webpage(url, mode="text")` fetches the deployed URL, repository
+1. `gl.nondet.web.render(url, mode="text")` fetches the deployed URL, repository
    URL, and each evidence URL — each fetch is independently try/excepted, so
    one broken link never crashes the whole evaluation, it just becomes
    `[COULD NOT BE FETCHED: ...]` content for that source.
 2. A single prompt is built with an explicit three-tier hierarchy (see
-   "Prompt Injection Defense" below) and sent through `gl.exec_prompt`.
+   "Prompt Injection Defense" below) and sent through `gl.nondet.exec_prompt`.
 3. The raw text response is parsed as JSON and validated strictly by
    `_validate_evaluation_payload` (mirrored in
    `contracts/logic/workresolve_logic.py::validate_evaluation_payload` for
@@ -342,7 +342,7 @@ this review alongside the contract and frontend findings.
   set once at `create_milestone` and no contract method mutates them.
   `SubmitWorkView` renders them read-only.
 - **Evidence trust boundary / prompt injection**: see above.
-- **Malicious URLs**: `gl.get_webpage` fetch failures are caught per-URL on
+- **Malicious URLs**: `gl.nondet.web.render` fetch failures are caught per-URL on
   the contract side and become `UNVERIFIABLE`-leaning evidence text, never a
   crash; the frontend does not fetch evidence URLs itself at all (it only
   displays what the freelancer typed and what the contract already

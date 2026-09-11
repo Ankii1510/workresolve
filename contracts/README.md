@@ -52,7 +52,7 @@ This exercises every deterministic rule in the contract — canonicalization, th
 weighted scoring (including the UNVERIFIABLE-never-scores-as-PASS rule), the APPROVE/REJECT
 threshold decision, every malformed-evaluator-output rejection case, the full state-transition
 table, double-settlement protection, and deadline-based cancellation — without needing a GenVM
-runtime. It does not exercise `evaluate_and_finalize`'s actual `gl.exec_prompt`/`gl.get_webpage`
+runtime. It does not exercise `evaluate_and_finalize`'s actual `gl.nondet.exec_prompt`/`gl.nondet.web.render`
 calls, contract deployment, or fund transfers, because those genuinely require a live GenVM network.
 
 ## How to run the tests that need a live network (not run in this environment)

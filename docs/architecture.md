@@ -96,23 +96,23 @@ version-pinned, rather than documentation that can drift from the shipping SDK.
    (`sdk.genlayer.com/main/_static/ai/api.txt`, fetched via `WebFetch`) describes dotted,
    namespaced paths (`genlayer.eq_principle.strict_eq`, `genlayer.nondet.web.render`,
    `genlayer.nondet.exec_prompt`). Every bundled example contract instead calls flat names directly
-   on the `gl` facade: `gl.get_webpage(url, mode="text")`, `gl.exec_prompt(prompt) -> str`,
-   `gl.eq_principle_strict_eq(fn)`, `gl.eq_principle_prompt_comparative(fn, principle=...)`,
+   on the `gl` facade: `gl.nondet.web.render(url, mode="text")`, `gl.nondet.exec_prompt(prompt) -> str`,
+   `gl.eq_principle.strict_eq(fn)`, `gl.eq_principle.prompt_comparative(fn, principle=...)`,
    `gl.eq_principle_prompt_non_comparative(fn, task=..., criteria=...)`, `gl.message.sender_address`
    / `.value` / `.contract_address` / `.is_init` / `.chain_id`, `gl.ContractAt(address)`,
    `gl.deploy_contract(code=..., args=[...])`. **Decision: trust the flat names from real,
    executable, currently-shipping code.** The dotted form is very likely just Sphinx's
    module-qualified documentation naming rather than the literal callable path through the `gl`
    facade. `contracts/workresolve.py` uses the flat names throughout.
-2. **`gl.eq_principle_prompt_comparative` replaces the Phase 2 plan to use `gl.eq_principle_strict_eq`
+2. **`gl.eq_principle.prompt_comparative` replaces the Phase 2 plan to use `gl.eq_principle.strict_eq`
    for evaluation.** Phase 2 section 7 planned to force byte-exact agreement across validators over
-   a canonicalized JSON blob. Real examples show `eq_principle_prompt_comparative(fn, principle:
+   a canonicalized JSON blob. Real examples show `eq_principle.prompt_comparative(fn, principle:
    str)` as the SDK's purpose-built mechanism for validator consensus over free-text/LLM-derived
    output, where a natural-language `principle` states what "the same" means (here: every
    requirement's `status` must match exactly; `reason` wording may vary). This is a strictly better
    fit for LLM output than demanding byte-exact JSON, which would make consensus fail on any
    whitespace/wording difference between validators even when they agree on every requirement's
-   status. `evaluate_and_finalize` uses `eq_principle_prompt_comparative`.
+   status. `evaluate_and_finalize` uses `eq_principle.prompt_comparative`.
 3. **`gl.message.value` / `gl.message.sender_address` confirmed**, matching Phase 2's assumption in
    shape; `@gl.public.write.payable` is the confirmed decorator for a method that accepts native
    currency (used on `fund_milestone`), matching genlayer-js's `writeContract({..., value: bigint})`
